@@ -11,7 +11,7 @@ export interface HabitBase {
   streak: number;
   completedDates: Date[];
   active: boolean;
-  userId?: string; // For future authentication
+  userId: string;
 }
 
 export interface HabitDocument extends HabitBase, Document {

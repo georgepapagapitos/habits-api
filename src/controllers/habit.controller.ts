@@ -1,13 +1,24 @@
-import { Request, Response } from "express";
+import { Response } from "express";
 import { Habit } from "../models/habit.model";
 import { HabitBase } from "../types/habit.types";
+import { AuthenticatedRequest } from "../middleware/auth.middleware";
 
 export const habitController = {
-  // Get all habits
-  getAllHabits: async (req: Request, res: Response): Promise<void> => {
+  // Get all habits for the authenticated user
+  getAllHabits: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
-      // In the future, filter by userId for authenticated users
-      const habits = await Habit.find({ active: true }).sort({ createdAt: -1 });
+      if (!req.user || !req.user.id) {
+        res.status(401).json({
+          success: false,
+          error: "Not authorized",
+        });
+        return;
+      }
+
+      const habits = await Habit.find({ 
+        active: true,
+        userId: req.user.id 
+      }).sort({ createdAt: -1 });
 
       res.status(200).json({
         success: true,
@@ -23,14 +34,31 @@ export const habitController = {
   },
 
   // Get habit by ID
-  getHabitById: async (req: Request, res: Response): Promise<void> => {
+  getHabitById: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
+      if (!req.user || !req.user.id) {
+        res.status(401).json({
+          success: false,
+          error: "Not authorized",
+        });
+        return;
+      }
+
       const habit = await Habit.findById(req.params.id);
 
       if (!habit) {
         res.status(404).json({
           success: false,
           error: "Habit not found",
+        });
+        return;
+      }
+
+      // Check if the habit belongs to the authenticated user
+      if (habit.userId !== req.user.id) {
+        res.status(403).json({
+          success: false,
+          error: "Not authorized to access this habit",
         });
         return;
       }
@@ -48,12 +76,20 @@ export const habitController = {
   },
 
   // Create new habit
-  createHabit: async (req: Request, res: Response): Promise<void> => {
+  createHabit: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
+      if (!req.user || !req.user.id) {
+        res.status(401).json({
+          success: false,
+          error: "Not authorized",
+        });
+        return;
+      }
+
       const habitData: HabitBase = req.body;
 
-      // When auth is implemented:
-      // habitData.userId = req.user.id;
+      // Set the userId to the authenticated user's ID
+      habitData.userId = req.user.id;
 
       const habit = await Habit.create(habitData);
 
@@ -82,8 +118,16 @@ export const habitController = {
   },
 
   // Update habit
-  updateHabit: async (req: Request, res: Response): Promise<void> => {
+  updateHabit: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
+      if (!req.user || !req.user.id) {
+        res.status(401).json({
+          success: false,
+          error: "Not authorized",
+        });
+        return;
+      }
+
       const habitData: Partial<HabitBase> = req.body;
 
       // Find the habit first to ensure it exists
@@ -97,14 +141,14 @@ export const habitController = {
         return;
       }
 
-      // When auth is implemented:
-      // if (existingHabit.userId !== req.user.id) {
-      //   res.status(403).json({
-      //     success: false,
-      //     error: 'User not authorized to update this habit'
-      //   });
-      //   return;
-      // }
+      // Check if the habit belongs to the authenticated user
+      if (existingHabit.userId !== req.user.id) {
+        res.status(403).json({
+          success: false,
+          error: 'User not authorized to update this habit'
+        });
+        return;
+      }
 
       const habit = await Habit.findByIdAndUpdate(req.params.id, habitData, {
         new: true,
@@ -136,8 +180,16 @@ export const habitController = {
   },
 
   // Delete habit (soft delete by setting active to false)
-  deleteHabit: async (req: Request, res: Response): Promise<void> => {
+  deleteHabit: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
+      if (!req.user || !req.user.id) {
+        res.status(401).json({
+          success: false,
+          error: "Not authorized",
+        });
+        return;
+      }
+
       const habit = await Habit.findById(req.params.id);
 
       if (!habit) {
@@ -148,14 +200,14 @@ export const habitController = {
         return;
       }
 
-      // When auth is implemented:
-      // if (habit.userId !== req.user.id) {
-      //   res.status(403).json({
-      //     success: false,
-      //     error: 'User not authorized to delete this habit'
-      //   });
-      //   return;
-      // }
+      // Check if the habit belongs to the authenticated user
+      if (habit.userId !== req.user.id) {
+        res.status(403).json({
+          success: false,
+          error: 'User not authorized to delete this habit'
+        });
+        return;
+      }
 
       // Soft delete by marking as inactive
       await Habit.findByIdAndUpdate(req.params.id, { active: false });
@@ -173,8 +225,16 @@ export const habitController = {
   },
 
   // Toggle habit completion for a specific date
-  toggleCompletion: async (req: Request, res: Response): Promise<void> => {
+  toggleCompletion: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
+      if (!req.user || !req.user.id) {
+        res.status(401).json({
+          success: false,
+          error: "Not authorized",
+        });
+        return;
+      }
+
       const { date } = req.body;
 
       if (!date) {
@@ -195,14 +255,14 @@ export const habitController = {
         return;
       }
 
-      // When auth is implemented:
-      // if (habit.userId !== req.user.id) {
-      //   res.status(403).json({
-      //     success: false,
-      //     error: 'User not authorized to update this habit'
-      //   });
-      //   return;
-      // }
+      // Check if the habit belongs to the authenticated user
+      if (habit.userId !== req.user.id) {
+        res.status(403).json({
+          success: false,
+          error: 'User not authorized to update this habit'
+        });
+        return;
+      }
 
       const completionDate = new Date(date);
       const formattedDate = new Date(completionDate.setHours(0, 0, 0, 0));

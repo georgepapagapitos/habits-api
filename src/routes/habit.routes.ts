@@ -1,7 +1,11 @@
 import { Router } from "express";
 import { habitController } from "../controllers/habit.controller";
+import { protect } from "../middleware/auth.middleware";
 
 const router = Router();
+
+// Apply auth protection to all habit routes
+router.use(protect);
 
 // GET all habits
 router.get("/", habitController.getAllHabits);

@@ -64,8 +64,7 @@ const habitSchema = new Schema<HabitDocument>(
     },
     userId: {
       type: String,
-      // Will be required when authentication is implemented
-      // required: [true, 'User ID is required']
+      required: [true, 'User ID is required']
     },
   },
   {
