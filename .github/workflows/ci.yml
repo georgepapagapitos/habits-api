@@ -23,6 +23,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Run linting with auto-fix
+        run: npm run lint:fix || npm run lint -- --fix || npm run lint
+        
       - name: Run type check
         run: npm run typecheck
 
