@@ -1,5 +1,7 @@
 import mongoose, { Schema } from "mongoose";
 import { HabitDocument } from "../types/habit.types";
+import { isSameDay, subDays, startOfDay, getDay } from "date-fns";
+import { toZonedTime } from "date-fns-tz";
 
 const habitSchema = new Schema<HabitDocument>(
   {
@@ -84,7 +86,7 @@ habitSchema.index({ active: 1 });
 // Method to check if habit is completed for a specific date
 habitSchema.methods.isCompletedForDate = function (date: Date): boolean {
   // Import date-fns isSameDay function
-  const { isSameDay } = require("date-fns");
+  // isSameDay is imported at the top of the file
 
   // Log debugging info
   console.log(
@@ -120,14 +122,7 @@ habitSchema.methods.isCompletedForDate = function (date: Date): boolean {
 habitSchema.pre("save", function (next) {
   if (this.isModified("completedDates")) {
     // Import date-fns and date-fns-tz functions
-    const {
-      isSameDay,
-      subDays,
-      startOfDay,
-      getDay,
-      differenceInCalendarDays,
-    } = require("date-fns");
-    const { toZonedTime } = require("date-fns-tz");
+    // Functions are imported at the top of the file
 
     // Get the user's timezone or default to UTC
     const timezone = this.userTimezone || "UTC";
@@ -223,7 +218,7 @@ habitSchema.pre("save", function (next) {
       : todayStart; // Start from today otherwise
 
     let consecutiveDaysChecked = 0;
-    let lastDueDate = todayStart;
+    // No need to track last due date
 
     // Only go back 365 days at most (to prevent infinite loops)
     while (consecutiveDaysChecked < 365) {
@@ -253,8 +248,7 @@ habitSchema.pre("save", function (next) {
           break;
         }
 
-        // Remember this as the last due date we checked
-        lastDueDate = checkDate;
+        // No need to track last due date
       }
 
       // Move to the previous day

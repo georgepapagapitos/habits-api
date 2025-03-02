@@ -21,13 +21,14 @@ export const errorHandler = (
   err: Error | AppError,
   req: Request,
   res: Response,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   next: NextFunction
 ): void => {
   // Default error values
   let statusCode = 500;
   let message = "Something went wrong";
   let status = "error";
-  let stack = process.env.NODE_ENV === "production" ? {} : err.stack;
+  const stack = process.env.NODE_ENV === "production" ? {} : err.stack;
 
   // If it's our custom error, use its properties
   if ("statusCode" in err) {

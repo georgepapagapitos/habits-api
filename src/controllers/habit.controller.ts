@@ -2,6 +2,26 @@ import { Response } from "express";
 import { AuthenticatedRequest } from "../middleware/auth.middleware";
 import { Habit } from "../models/habit.model";
 import { HabitBase } from "../types/habit.types";
+import { parseISO, startOfDay, isSameDay } from "date-fns";
+import { toZonedTime } from "date-fns-tz";
+
+// Define a type for validation errors
+interface ValidationError {
+  name: string;
+  errors: Record<string, { message: string }>;
+}
+
+// Type guard function to check if an error is a ValidationError
+function isValidationError(error: unknown): error is ValidationError {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "name" in error &&
+    (error as ValidationError).name === "ValidationError" &&
+    "errors" in error &&
+    typeof (error as ValidationError).errors === "object"
+  );
+}
 
 export const habitController = {
   // Get all habits for the authenticated user
@@ -106,11 +126,9 @@ export const habitController = {
         success: true,
         data: habit,
       });
-    } catch (error: any) {
-      if (error.name === "ValidationError") {
-        const messages = Object.values(error.errors).map(
-          (err: any) => err.message
-        );
+    } catch (error) {
+      if (isValidationError(error)) {
+        const messages = Object.values(error.errors).map((err) => err.message);
 
         res.status(400).json({
           success: false,
@@ -171,11 +189,9 @@ export const habitController = {
         success: true,
         data: habit,
       });
-    } catch (error: any) {
-      if (error.name === "ValidationError") {
-        const messages = Object.values(error.errors).map(
-          (err: any) => err.message
-        );
+    } catch (error) {
+      if (isValidationError(error)) {
+        const messages = Object.values(error.errors).map((err) => err.message);
 
         res.status(400).json({
           success: false,
@@ -267,10 +283,6 @@ export const habitController = {
         return;
       }
 
-      // Import date-fns and date-fns-tz functions
-      const { parseISO, startOfDay, format } = require("date-fns");
-      const { toZonedTime } = require("date-fns-tz");
-
       // Default to UTC if no timezone provided
       const userTimezone = timezone || "UTC";
 
@@ -317,10 +329,7 @@ export const habitController = {
 
       if (isCompleted) {
         // Remove the date if already completed
-        // The current filter is incorrect - it would remove ALL dates or none
-        // Instead, we need to filter out only the matching date
         habit.completedDates = habit.completedDates.filter((d: Date) => {
-          const { isSameDay } = require("date-fns");
           return !isSameDay(new Date(d), new Date(dateInUserTz));
         });
       } else {
@@ -345,20 +354,24 @@ export const habitController = {
           success: true,
           data: savedHabit,
         });
-      } catch (saveError: any) {
+      } catch (saveError) {
+        const errorMessage =
+          saveError instanceof Error ? saveError.message : String(saveError);
         console.error("Error saving habit:", saveError);
         res.status(500).json({
           success: false,
           error: "Error saving habit",
-          details: saveError.message || String(saveError),
+          details: errorMessage,
         });
       }
-    } catch (error: any) {
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       console.error("Toggle completion error:", error);
       res.status(500).json({
         success: false,
         error: "Server Error",
-        details: error.message || String(error),
+        details: errorMessage,
       });
     }
   },
