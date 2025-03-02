@@ -253,7 +253,11 @@ export const habitController = {
         return;
       }
 
-      const { date } = req.body;
+      const { date, timezone } = req.body;
+
+      console.log(
+        `Toggle request received: id=${req.params.id}, date=${date}, timezone=${timezone}`
+      );
 
       if (!date) {
         res.status(400).json({
@@ -262,6 +266,15 @@ export const habitController = {
         });
         return;
       }
+
+      // Import date-fns and date-fns-tz functions
+      const { parseISO, startOfDay, format } = require("date-fns");
+      const { toZonedTime } = require("date-fns-tz");
+
+      // Default to UTC if no timezone provided
+      const userTimezone = timezone || "UTC";
+
+      console.log(`Using timezone: ${userTimezone}`);
 
       const habit = await Habit.findById(req.params.id);
 
@@ -282,33 +295,70 @@ export const habitController = {
         return;
       }
 
-      const completionDate = new Date(date);
-      const formattedDate = new Date(completionDate.setHours(0, 0, 0, 0));
+      // Parse the ISO date string to a Date object
+      const parsedDate = parseISO(date);
+
+      console.log(`Parsed date: ${parsedDate.toISOString()}`);
+
+      // Convert the date to the user's timezone, then to UTC for consistent storage
+      // This ensures the date represents the correct calendar day in the user's timezone
+      const dateInUserTz = startOfDay(toZonedTime(parsedDate, userTimezone));
+
+      console.log(
+        `Date in user timezone (${userTimezone}): ${dateInUserTz.toISOString()}`
+      );
+      console.log(
+        `Habit completed dates: ${habit.completedDates.map((d) => new Date(d).toISOString()).join(", ")}`
+      );
 
       // Check if the date is already in completedDates
-      const isCompleted = habit.isCompletedForDate(formattedDate);
+      const isCompleted = habit.isCompletedForDate(dateInUserTz);
+      console.log(`Is already completed for date: ${isCompleted}`);
 
       if (isCompleted) {
         // Remove the date if already completed
-        habit.completedDates = habit.completedDates.filter(
-          (d: Date) =>
-            new Date(d).setHours(0, 0, 0, 0) !== formattedDate.getTime()
-        );
+        // The current filter is incorrect - it would remove ALL dates or none
+        // Instead, we need to filter out only the matching date
+        habit.completedDates = habit.completedDates.filter((d: Date) => {
+          const { isSameDay } = require("date-fns");
+          return !isSameDay(new Date(d), new Date(dateInUserTz));
+        });
       } else {
         // Add the date if not completed
-        habit.completedDates.push(formattedDate);
+        habit.completedDates.push(dateInUserTz);
       }
 
-      await habit.save();
+      // Store the user's timezone preference in the habit document
+      habit.userTimezone = userTimezone;
 
-      res.status(200).json({
-        success: true,
-        data: habit,
-      });
-    } catch (error) {
+      // Save the updated habit
+      try {
+        const savedHabit = await habit.save();
+        console.log(
+          `Habit saved successfully. New streak: ${savedHabit.streak}`
+        );
+        console.log(
+          `Updated completed dates: ${savedHabit.completedDates.map((d) => new Date(d).toISOString()).join(", ")}`
+        );
+
+        res.status(200).json({
+          success: true,
+          data: savedHabit,
+        });
+      } catch (saveError: any) {
+        console.error("Error saving habit:", saveError);
+        res.status(500).json({
+          success: false,
+          error: "Error saving habit",
+          details: saveError.message || String(saveError),
+        });
+      }
+    } catch (error: any) {
+      console.error("Toggle completion error:", error);
       res.status(500).json({
         success: false,
         error: "Server Error",
+        details: error.message || String(error),
       });
     }
   },

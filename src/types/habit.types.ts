@@ -12,6 +12,7 @@ export interface HabitBase {
   completedDates: Date[];
   active: boolean;
   userId: string;
+  userTimezone?: string; // Store user's timezone for correct date calculations
 }
 
 export interface HabitDocument extends HabitBase, Document {

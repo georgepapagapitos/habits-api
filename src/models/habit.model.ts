@@ -66,6 +66,11 @@ const habitSchema = new Schema<HabitDocument>(
       type: String,
       required: [true, "User ID is required"],
     },
+    // Add user timezone preference field to store timezone
+    userTimezone: {
+      type: String,
+      default: "UTC",
+    },
   },
   {
     timestamps: true,
@@ -78,31 +83,74 @@ habitSchema.index({ active: 1 });
 
 // Method to check if habit is completed for a specific date
 habitSchema.methods.isCompletedForDate = function (date: Date): boolean {
-  const formattedDate = new Date(date).setHours(0, 0, 0, 0);
-  return this.completedDates.some(
-    (completedDate: Date) =>
-      new Date(completedDate).setHours(0, 0, 0, 0) === formattedDate
+  // Import date-fns isSameDay function
+  const { isSameDay } = require("date-fns");
+
+  // Log debugging info
+  console.log(
+    `Checking if date ${new Date(date).toISOString()} is in completed dates`
   );
+
+  if (
+    !this.completedDates ||
+    !Array.isArray(this.completedDates) ||
+    this.completedDates.length === 0
+  ) {
+    console.log("No completed dates to check against");
+    return false;
+  }
+
+  // Compare with completed dates using date-fns isSameDay function
+  // which checks if two dates have the same year, month, and day
+  const isCompleted = this.completedDates.some((completedDate: Date) => {
+    const compDate = new Date(completedDate);
+    const checkDate = new Date(date);
+    const result = isSameDay(compDate, checkDate);
+    console.log(
+      `Comparing ${compDate.toISOString()} with ${checkDate.toISOString()} => ${result}`
+    );
+    return result;
+  });
+
+  console.log(`Final result: ${isCompleted}`);
+  return isCompleted;
 };
 
 // Pre-save middleware to update streak
 habitSchema.pre("save", function (next) {
   if (this.isModified("completedDates")) {
-    // Logic to calculate streak based on completedDates and frequency
-    const sortedDates = [...this.completedDates]
-      .map((date) => {
-        const d = new Date(date);
-        d.setHours(0, 0, 0, 0);
-        return d.getTime();
-      })
-      .sort((a, b) => b - a); // Sort in descending order (newest first)
+    // Import date-fns and date-fns-tz functions
+    const {
+      isSameDay,
+      subDays,
+      startOfDay,
+      getDay,
+      differenceInCalendarDays,
+    } = require("date-fns");
+    const { toZonedTime } = require("date-fns-tz");
 
-    if (sortedDates.length === 0) {
+    // Get the user's timezone or default to UTC
+    const timezone = this.userTimezone || "UTC";
+
+    // Add debug logging
+    console.log(
+      `Calculating streak for habit: ${this._id}, name: ${this.name}`
+    );
+    console.log(`Current streak: ${this.streak}`);
+    console.log(`Completed dates count: ${this.completedDates.length}`);
+
+    // If no completed dates, streak is 0
+    if (
+      !this.completedDates ||
+      !Array.isArray(this.completedDates) ||
+      this.completedDates.length === 0
+    ) {
+      console.log("No completed dates, setting streak to 0");
       this.streak = 0;
       return next();
     }
 
-    // Convert frequency to day indices (0 = Sunday, 1 = Monday, etc.)
+    // Map day names to indices (0 = Sunday, 1 = Monday, etc.)
     const daysOfWeek = [
       "sunday",
       "monday",
@@ -112,67 +160,108 @@ habitSchema.pre("save", function (next) {
       "friday",
       "saturday",
     ];
+
+    // Convert frequency names to day indices
     const frequencyIndices = this.frequency
       .map((day) => daysOfWeek.indexOf(day.toLowerCase()))
       .filter((index) => index !== -1)
       .sort((a, b) => a - b);
 
-    // Get today's date and set hours to midnight
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayTime = today.getTime();
+    console.log(`Frequency indices: ${frequencyIndices.join(", ")}`);
 
-    // Initialize streak counter
-    let streak = 0;
+    // Get today in user's timezone
+    const now = new Date();
+    console.log(`Using timezone: ${timezone}`);
 
-    // Check if the habit was completed today if it was due
-    const todayIndex = today.getDay();
+    const todayInUserTz = toZonedTime(now, timezone);
+    const todayStart = startOfDay(todayInUserTz);
+
+    console.log(`Today in user timezone: ${todayStart.toISOString()}`);
+
+    // Get today's day of week in user's timezone (0-6)
+    const todayIndex = getDay(todayStart);
+    console.log(`Today's day index: ${todayIndex} (${daysOfWeek[todayIndex]})`);
+
+    // Check if the habit is due today
     const isDueToday = frequencyIndices.includes(todayIndex);
-    const isCompletedToday = sortedDates[0] === todayTime;
+    console.log(`Is due today: ${isDueToday}`);
 
-    // If due today but not completed, break the streak
+    // Convert completed dates to Date objects, in user's timezone
+    const completedDatesInTz = this.completedDates.map((date) => {
+      const dateObj = toZonedTime(new Date(date), timezone);
+      return startOfDay(dateObj); // Normalize to start of day
+    });
+
+    // Sort completed dates from newest to oldest
+    completedDatesInTz.sort((a, b) => b.getTime() - a.getTime());
+
+    console.log(
+      `Completed dates (newest first): ${completedDatesInTz.map((d) => d.toISOString()).join(", ")}`
+    );
+
+    // Check if completed today
+    const isCompletedToday = completedDatesInTz.some((date) =>
+      isSameDay(date, todayStart)
+    );
+    console.log(`Is completed today: ${isCompletedToday}`);
+
+    // Simple streak calculation:
+    // 1. If due today but not completed, streak is 0 (but only if it's not a future due date)
     if (isDueToday && !isCompletedToday) {
+      console.log("Due today but not completed, setting streak to 0");
       this.streak = 0;
       return next();
     }
 
-    // If completed today, start counting
-    if (isCompletedToday) {
-      streak = 1;
-    }
+    // 2. Start with 0 or 1 depending on today's completion
+    let streak = isCompletedToday ? 1 : 0;
+    console.log(`Starting streak count: ${streak}`);
 
-    // Create a map of completed dates for faster lookup
-    const completedDatesMap = new Set(sortedDates);
+    // 3. Go backwards through the calendar, checking each due date
+    let checkDate = isCompletedToday
+      ? subDays(todayStart, 1) // Start from yesterday if today is completed
+      : todayStart; // Start from today otherwise
 
-    // Get the date range to check (go back up to 365 days)
-    let checkDate = new Date(today);
-    if (isCompletedToday) {
-      // If completed today, start checking from yesterday
-      checkDate.setDate(checkDate.getDate() - 1);
-    }
+    let consecutiveDaysChecked = 0;
+    let lastDueDate = todayStart;
 
-    // Check the past year, one day at a time
-    for (let i = 0; i < 365; i++) {
-      const checkDateIndex = checkDate.getDay();
-      const isDueOnCheckDate = frequencyIndices.includes(checkDateIndex);
+    // Only go back 365 days at most (to prevent infinite loops)
+    while (consecutiveDaysChecked < 365) {
+      consecutiveDaysChecked++;
 
-      // Only check days when the habit was due
-      if (isDueOnCheckDate) {
-        const checkDateTime = checkDate.getTime();
+      // Check if this day is a due date
+      const dayIndex = getDay(checkDate);
+      const isDueDate = frequencyIndices.includes(dayIndex);
 
-        // If this due date was completed, increase streak
-        if (completedDatesMap.has(checkDateTime)) {
+      if (isDueDate) {
+        // This is a due date, check if it was completed
+        const wasCompleted = completedDatesInTz.some((date) =>
+          isSameDay(date, checkDate)
+        );
+
+        console.log(
+          `Checking ${checkDate.toISOString()} (${daysOfWeek[dayIndex]}): due=${isDueDate}, completed=${wasCompleted}`
+        );
+
+        if (wasCompleted) {
+          // This due date was completed, add to streak
           streak++;
+          console.log(`  Added to streak, now: ${streak}`);
         } else {
-          // If a due date was missed, stop counting
+          // This due date was missed, streak is broken
+          console.log(`  Streak broken on ${checkDate.toISOString()}`);
           break;
         }
+
+        // Remember this as the last due date we checked
+        lastDueDate = checkDate;
       }
 
       // Move to the previous day
-      checkDate.setDate(checkDate.getDate() - 1);
+      checkDate = subDays(checkDate, 1);
     }
 
+    console.log(`Final streak calculation: ${streak}`);
     this.streak = streak;
   }
   next();
