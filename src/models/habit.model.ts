@@ -28,13 +28,13 @@ const habitSchema = new Schema<HabitDocument>(
       validate: {
         validator: function (value: string[]) {
           const validDays = [
+            "sunday",
             "monday",
             "tuesday",
             "wednesday",
             "thursday",
             "friday",
             "saturday",
-            "sunday",
           ];
           return value.every((day) => validDays.includes(day.toLowerCase()));
         },
