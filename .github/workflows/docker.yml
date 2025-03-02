@@ -3,17 +3,12 @@ name: Backend Docker Build
 on:
   push:
     branches: [main]
-    paths:
-      - "habits-api/**"
     tags:
       - "v*"
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./habits-api
 
     steps:
       - uses: actions/checkout@v3
@@ -42,7 +37,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v4
         with:
-          context: ./habits-api
+          context: .
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
