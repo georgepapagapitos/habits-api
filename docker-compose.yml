@@ -18,7 +18,7 @@ services:
 
   # Frontend service
   frontend:
-    build: ../FE
+    build: ../habits-ui
     container_name: frontend
     restart: unless-stopped
     ports:

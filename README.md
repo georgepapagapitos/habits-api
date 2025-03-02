@@ -1,4 +1,4 @@
-# Hannah's Habits - Backend
+# Habits API
 
 The API server for the Hannah's Habits application, connecting to MongoDB Atlas.
 

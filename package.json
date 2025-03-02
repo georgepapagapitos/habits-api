@@ -1,7 +1,7 @@
 {
-  "name": "hannahs-habits-api",
+  "name": "habits-api",
   "version": "1.0.0",
-  "description": "Backend API for Hannah's Habits",
+  "description": "Backend API for Habits",
   "main": "dist/index.js",
   "scripts": {
     "start": "node dist/server.js",
