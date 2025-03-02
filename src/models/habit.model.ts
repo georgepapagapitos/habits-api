@@ -64,7 +64,7 @@ const habitSchema = new Schema<HabitDocument>(
     },
     userId: {
       type: String,
-      required: [true, 'User ID is required']
+      required: [true, "User ID is required"],
     },
   },
   {
@@ -89,19 +89,80 @@ habitSchema.methods.isCompletedForDate = function (date: Date): boolean {
 habitSchema.pre("save", function (next) {
   if (this.isModified("completedDates")) {
     // Logic to calculate streak based on completedDates and frequency
-    // This is a simplified version and would need to be enhanced based on exact requirements
-    const sortedDates = [...this.completedDates].sort(
-      (a, b) => a.getTime() - b.getTime()
-    );
+    const sortedDates = [...this.completedDates].map(date => {
+      const d = new Date(date);
+      d.setHours(0, 0, 0, 0);
+      return d.getTime();
+    }).sort((a, b) => b - a); // Sort in descending order (newest first)
 
     if (sortedDates.length === 0) {
       this.streak = 0;
       return next();
     }
 
-    // Here would go more complex streak calculation logic
-    // For now, we'll just set the streak to the number of completed dates
-    // In real implementation, you'd need to check for consecutive days relative to frequency
+    // Convert frequency to day indices (0 = Sunday, 1 = Monday, etc.)
+    const daysOfWeek = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+    const frequencyIndices = this.frequency.map(day => daysOfWeek.indexOf(day.toLowerCase()))
+      .filter(index => index !== -1)
+      .sort((a, b) => a - b);
+
+    // Get today's date and set hours to midnight
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayTime = today.getTime();
+
+    // Initialize streak counter
+    let streak = 0;
+    
+    // Check if the habit was completed today if it was due
+    const todayIndex = today.getDay();
+    const isDueToday = frequencyIndices.includes(todayIndex);
+    const isCompletedToday = sortedDates[0] === todayTime;
+    
+    // If due today but not completed, break the streak
+    if (isDueToday && !isCompletedToday) {
+      this.streak = 0;
+      return next();
+    }
+    
+    // If completed today, start counting
+    if (isCompletedToday) {
+      streak = 1;
+    }
+
+    // Create a map of completed dates for faster lookup
+    const completedDatesMap = new Set(sortedDates);
+    
+    // Get the date range to check (go back up to 365 days)
+    let checkDate = new Date(today);
+    if (isCompletedToday) {
+      // If completed today, start checking from yesterday
+      checkDate.setDate(checkDate.getDate() - 1);
+    }
+    
+    // Check the past year, one day at a time
+    for (let i = 0; i < 365; i++) {
+      const checkDateIndex = checkDate.getDay();
+      const isDueOnCheckDate = frequencyIndices.includes(checkDateIndex);
+      
+      // Only check days when the habit was due
+      if (isDueOnCheckDate) {
+        const checkDateTime = checkDate.getTime();
+        
+        // If this due date was completed, increase streak
+        if (completedDatesMap.has(checkDateTime)) {
+          streak++;
+        } else {
+          // If a due date was missed, stop counting
+          break;
+        }
+      }
+      
+      // Move to the previous day
+      checkDate.setDate(checkDate.getDate() - 1);
+    }
+    
+    this.streak = streak;
   }
   next();
 });

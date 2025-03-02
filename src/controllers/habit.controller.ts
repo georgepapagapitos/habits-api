@@ -1,11 +1,14 @@
 import { Response } from "express";
+import { AuthenticatedRequest } from "../middleware/auth.middleware";
 import { Habit } from "../models/habit.model";
 import { HabitBase } from "../types/habit.types";
-import { AuthenticatedRequest } from "../middleware/auth.middleware";
 
 export const habitController = {
   // Get all habits for the authenticated user
-  getAllHabits: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  getAllHabits: async (
+    req: AuthenticatedRequest,
+    res: Response
+  ): Promise<void> => {
     try {
       if (!req.user || !req.user.id) {
         res.status(401).json({
@@ -15,9 +18,9 @@ export const habitController = {
         return;
       }
 
-      const habits = await Habit.find({ 
+      const habits = await Habit.find({
         active: true,
-        userId: req.user.id 
+        userId: req.user.id,
       }).sort({ createdAt: -1 });
 
       res.status(200).json({
@@ -34,7 +37,10 @@ export const habitController = {
   },
 
   // Get habit by ID
-  getHabitById: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  getHabitById: async (
+    req: AuthenticatedRequest,
+    res: Response
+  ): Promise<void> => {
     try {
       if (!req.user || !req.user.id) {
         res.status(401).json({
@@ -76,7 +82,10 @@ export const habitController = {
   },
 
   // Create new habit
-  createHabit: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  createHabit: async (
+    req: AuthenticatedRequest,
+    res: Response
+  ): Promise<void> => {
     try {
       if (!req.user || !req.user.id) {
         res.status(401).json({
@@ -118,7 +127,10 @@ export const habitController = {
   },
 
   // Update habit
-  updateHabit: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  updateHabit: async (
+    req: AuthenticatedRequest,
+    res: Response
+  ): Promise<void> => {
     try {
       if (!req.user || !req.user.id) {
         res.status(401).json({
@@ -145,7 +157,7 @@ export const habitController = {
       if (existingHabit.userId !== req.user.id) {
         res.status(403).json({
           success: false,
-          error: 'User not authorized to update this habit'
+          error: "User not authorized to update this habit",
         });
         return;
       }
@@ -180,7 +192,10 @@ export const habitController = {
   },
 
   // Delete habit (soft delete by setting active to false)
-  deleteHabit: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  deleteHabit: async (
+    req: AuthenticatedRequest,
+    res: Response
+  ): Promise<void> => {
     try {
       if (!req.user || !req.user.id) {
         res.status(401).json({
@@ -204,7 +219,7 @@ export const habitController = {
       if (habit.userId !== req.user.id) {
         res.status(403).json({
           success: false,
-          error: 'User not authorized to delete this habit'
+          error: "User not authorized to delete this habit",
         });
         return;
       }
@@ -225,7 +240,10 @@ export const habitController = {
   },
 
   // Toggle habit completion for a specific date
-  toggleCompletion: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  toggleCompletion: async (
+    req: AuthenticatedRequest,
+    res: Response
+  ): Promise<void> => {
     try {
       if (!req.user || !req.user.id) {
         res.status(401).json({
@@ -259,7 +277,7 @@ export const habitController = {
       if (habit.userId !== req.user.id) {
         res.status(403).json({
           success: false,
-          error: 'User not authorized to update this habit'
+          error: "User not authorized to update this habit",
         });
         return;
       }

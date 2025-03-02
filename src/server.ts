@@ -1,6 +1,7 @@
 import app from "./app";
 import { connectDB } from "./config/db";
 import { PORT } from "./config/env";
+import { setupScheduler } from "./utils/scheduler";
 
 // Connect to MongoDB
 connectDB()
@@ -11,6 +12,10 @@ connectDB()
         `Server running in ${process.env.NODE_ENV} mode on port ${PORT}`
       );
     });
+
+    // Set up scheduled tasks
+    setupScheduler();
+    console.log('Scheduler initialized');
 
     // Handle unhandled promise rejections
     process.on("unhandledRejection", (err: Error) => {

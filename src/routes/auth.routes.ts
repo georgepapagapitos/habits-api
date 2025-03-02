@@ -1,11 +1,11 @@
 import express from "express";
 import {
-  registerUser,
-  loginUser,
   getCurrentUser,
+  loginUser,
+  registerUser,
 } from "../controllers/auth.controller";
-import { validateLogin, validateRegister } from "../middleware/auth.validation";
 import { protect } from "../middleware/auth.middleware";
+import { validateLogin, validateRegister } from "../middleware/auth.validation";
 
 const router = express.Router();
 
