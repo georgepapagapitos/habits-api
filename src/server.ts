@@ -6,16 +6,19 @@ import { setupScheduler } from "./utils/scheduler";
 // Connect to MongoDB
 connectDB()
   .then(() => {
-    // Start server
-    const server = app.listen(PORT, () => {
+    // Start server - listen on all network interfaces
+    const server = app.listen(PORT, "0.0.0.0", () => {
       console.log(
         `Server running in ${process.env.NODE_ENV} mode on port ${PORT}`
+      );
+      console.log(
+        `Access the server at http://localhost:${PORT} or http://192.168.0.20:${PORT}`
       );
     });
 
     // Set up scheduled tasks
     setupScheduler();
-    console.log('Scheduler initialized');
+    console.log("Scheduler initialized");
 
     // Handle unhandled promise rejections
     process.on("unhandledRejection", (err: Error) => {
