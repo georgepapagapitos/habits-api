@@ -1,8 +1,8 @@
-import express, { Express } from "express";
 import cors from "cors";
+import express, { Express } from "express";
 import helmet from "helmet";
-import routes from "./routes";
 import { errorHandler, notFoundHandler } from "./middleware/error.middleware";
+import routes from "./routes";
 
 const app: Express = express();
 
@@ -13,7 +13,7 @@ app.use(
   cors({
     origin:
       process.env.NODE_ENV === "production"
-        ? ["https://yourproductiondomain.com"] // Restrict in production
+        ? ["http://habits.rubygal.com"] // Restrict in production
         : ["http://localhost:3000", "http://192.168.0.20:3000"], // Allow local development
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     credentials: true,
