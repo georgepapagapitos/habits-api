@@ -1,5 +1,8 @@
 # Habits - API
 
+[![Test Suite](https://github.com/georgepapagapitos/hannahs-habits/actions/workflows/test.yml/badge.svg)](https://github.com/georgepapagapitos/hannahs-habits/actions/workflows/test.yml)
+[![Build and Deploy](https://github.com/georgepapagapitos/hannahs-habits/actions/workflows/build.yml/badge.svg)](https://github.com/georgepapagapitos/hannahs-habits/actions/workflows/build.yml)
+
 A RESTful API for the Hannah's Habits application built with Node.js, Express, TypeScript, and MongoDB.
 
 ## Features
@@ -9,6 +12,8 @@ A RESTful API for the Hannah's Habits application built with Node.js, Express, T
 - 📊 Track habit completion data
 - 🛡️ Input validation and error handling
 - 📝 Type safety with TypeScript
+- 🧪 Comprehensive test suite
+- 🔄 Continuous integration testing
 - 🚀 Docker support for easy deployment
 
 ## Tech Stack
@@ -91,6 +96,44 @@ A RESTful API for the Hannah's Habits application built with Node.js, Express, T
 - `npm start` - Start the production server
 - `npm run lint` - Run ESLint
 - `npm run lint:fix` - Fix ESLint errors automatically
+- `npm test` - Run tests
+- `npm run test:all` - Run all tests including those that may need fixes
+- `npm run test:coverage` - Run tests with coverage report
+- `npm run test:watch` - Run tests in watch mode
+
+## Testing
+
+The API includes a comprehensive test suite built with Jest to ensure functionality and prevent regressions.
+
+### Running Tests
+
+```bash
+# Run all functioning tests
+npm test
+
+# Run all tests (including potentially broken ones)
+npm run test:all
+
+# Run tests with coverage report
+npm run test:coverage
+```
+
+### Test Structure
+
+The test suite is organized into several categories:
+
+- **Core Functionality Tests**: Tests for critical business logic like streak calculation, habit frequency, and date handling
+- **Authentication Tests**: Tests for JWT token generation, user model, and auth middleware
+- **API Tests**: Tests for controller endpoints and request handling
+- **Infrastructure Tests**: Tests for configuration, error handling, and validation
+
+### Continuous Integration
+
+Tests run automatically on every push and pull request through GitHub Actions, ensuring that:
+
+1. All tests pass
+2. TypeScript types are valid
+3. Code meets linting standards
 
 ## Docker Support
 
@@ -117,29 +160,44 @@ docker run -p 5050:5050 habits-api
 habits-api/
 ├── dist/              # Compiled JavaScript files
 ├── src/
+│   ├── __tests__/     # Test files
+│   │   ├── streak-calculation.spec.ts  # Tests for streak calculation
+│   │   ├── habit.frequency.spec.ts     # Tests for habit frequency
+│   │   ├── habit.utils.spec.ts         # Tests for utility functions
+│   │   ├── auth.middleware.spec.ts     # Tests for auth middleware
+│   │   ├── environment.spec.ts         # Tests for environment config
+│   │   └── ...
 │   ├── config/        # Configuration files
 │   │   ├── db.ts      # Database connection
 │   │   └── env.ts     # Environment variables
 │   ├── controllers/   # Request handlers
+│   │   ├── auth.controller.ts
 │   │   └── habit.controller.ts
 │   ├── middleware/    # Custom middleware
 │   │   ├── auth.middleware.ts
 │   │   └── error.middleware.ts
 │   ├── models/        # Mongoose models
-│   │   └── habit.model.ts
+│   │   ├── habit.model.ts
+│   │   └── user.model.ts
 │   ├── routes/        # API routes
 │   │   ├── auth.routes.ts
 │   │   ├── habit.routes.ts
 │   │   └── index.ts
 │   ├── types/         # TypeScript interfaces
-│   │   └── habit.types.ts
+│   │   ├── habit.types.ts
+│   │   └── user.types.ts
 │   ├── utils/         # Utility functions
-│   │   └── error.utils.ts
+│   │   ├── error.utils.ts
+│   │   └── scheduler.ts
 │   ├── app.ts         # Express app setup
 │   └── server.ts      # Server entry point
 ├── .env               # Environment variables (not in version control)
+├── .github/workflows/ # CI/CD configuration
+│   ├── test.yml       # Test workflow
+│   └── build.yml      # Build and deployment workflow
 ├── Dockerfile         # Docker configuration
 ├── docker-compose.yml # Docker Compose configuration
+├── jest.config.js     # Jest configuration
 ├── package.json       # Project dependencies and scripts
 └── tsconfig.json      # TypeScript configuration
 ```
