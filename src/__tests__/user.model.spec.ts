@@ -1,16 +1,13 @@
-import { Document } from "mongoose";
 import bcrypt from "bcryptjs";
 
 // Mock bcryptjs
 jest.mock("bcryptjs");
 
-// User interface for typing
-interface IUser extends Document {
-  username: string;
-  email: string;
-  password: string;
-  comparePassword(candidatePassword: string): Promise<boolean>;
-}
+// User interface for typing - not used directly in tests but helpful for documentation
+// and understanding the structure of the User model
+/**
+ * @deprecated This interface is for documentation purposes only
+ */
 
 // Simple Mock User model schema
 class MockUserModel {
@@ -31,7 +28,7 @@ class MockUserModel {
 
   // Static method to validate email format
   static isValidEmail(email: string): boolean {
-    const emailRegex = /^([\w-\.]+@([\w-]+\.)+[\w-]{2,4})?$/;
+    const emailRegex = /^([\w.-]+@([\w-]+\.)+[\w-]{2,4})?$/;
     return emailRegex.test(email);
   }
 }
@@ -49,7 +46,7 @@ describe("User Model", () => {
 
     // Mock bcrypt.compare
     (bcrypt.compare as jest.Mock).mockImplementation(
-      (candidatePassword: string, hashedPassword: string) => {
+      (candidatePassword: string) => {
         return Promise.resolve(candidatePassword === "correct_password");
       }
     );

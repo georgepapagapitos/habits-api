@@ -5,7 +5,7 @@ const sendErrorResponse = (
   res: Response,
   statusCode: number,
   message: string,
-  error?: any
+  error?: unknown
 ) => {
   return res.status(statusCode).json({
     success: false,

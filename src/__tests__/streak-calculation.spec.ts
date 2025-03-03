@@ -1,6 +1,5 @@
-import mongoose from "mongoose";
+import { subDays } from "date-fns";
 import { HabitDocument } from "../types/habit.types";
-import { addDays, format, subDays } from "date-fns";
 
 // Mock date-fns-tz methods to prevent timezone issues in tests
 jest.mock("date-fns-tz", () => ({
@@ -274,7 +273,6 @@ describe("Streak Calculation", () => {
     today.setHours(0, 0, 0, 0);
 
     // Find a day that's not today
-    let futureDay = (today.getDay() + 2) % 7; // Skip one day
     const futureDayName = getDayName(
       new Date(today.getFullYear(), today.getMonth(), today.getDate() + 2)
     );

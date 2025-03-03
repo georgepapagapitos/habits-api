@@ -1,7 +1,7 @@
 import { Response } from "express";
 import { habitController } from "../controllers/habit.controller";
-import { Habit } from "../models/habit.model";
 import { AuthenticatedRequest } from "../middleware/auth.middleware";
+import { Habit } from "../models/habit.model";
 
 // Mock the Habit model
 jest.mock("../models/habit.model", () => {
@@ -18,7 +18,17 @@ jest.mock("../models/habit.model", () => {
 describe("Habit Controller", () => {
   let mockRequest: Partial<AuthenticatedRequest>;
   let mockResponse: Partial<Response>;
-  let mockHabit: any;
+  let mockHabit: {
+    _id: string;
+    name: string;
+    frequency: string[];
+    completedDates: string[];
+    streak: number;
+    userId: string;
+    save: jest.Mock;
+    userTimezone: string;
+    isCompletedForDate: jest.Mock;
+  };
 
   beforeEach(() => {
     // Reset mocks for each test
