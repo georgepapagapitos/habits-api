@@ -42,7 +42,7 @@ server.log
 .DS_Store
 Thumbs.db
 
-# TypeScript configuration (not needed at runtime)
-tsconfig.json
+# TypeScript configuration (not needed at runtime, but needed for build)
+# tsconfig.json  # Commented out as it's needed for the build process
 .eslintrc.json
 .prettierrc

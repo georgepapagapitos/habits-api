@@ -15,9 +15,6 @@ RUN npm ci
 # Copy source code and configuration files
 COPY . .
 
-# Ensure TypeScript configuration files are in place and readable
-RUN ls -la *.json && cat tsconfig.json
-
 # Build the application
 RUN npm run build
 
