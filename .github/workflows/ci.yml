@@ -26,16 +26,15 @@ jobs:
       # Skip linting for now since we've upgraded to ESLint v9
       # - name: Run linting with auto-fix
       #   run: npm run lint:fix || npm run lint -- --fix || npm run lint || true
-        
+
       - name: Run type check
         run: npm run typecheck
 
       - name: Build
         run: npm run build
 
-      # Skip tests for now since test script is set to exit with error
-      # - name: Run tests
-      #   run: npm test
-      #   env:
-      #     JWT_SECRET: ${{ secrets.JWT_SECRET || 'test-secret' }}
-      #     MONGODB_URI: ${{ secrets.MONGODB_URI || 'mongodb://localhost:27017/habits-test' }}
+      - name: Run tests
+        run: npm test
+        env:
+          JWT_SECRET: ${{ secrets.JWT_SECRET || 'test-secret' }}
+          MONGODB_URI: ${{ secrets.MONGODB_URI || 'mongodb://localhost:27017/habits-test' }}
