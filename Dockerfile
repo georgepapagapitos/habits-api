@@ -12,11 +12,11 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 
-# Copy source code
+# Copy source code and configuration files
 COPY . .
 
-# Create a tsconfig.build.json for production build
-COPY tsconfig.build.json ./
+# Ensure TypeScript configuration files are in place and readable
+RUN ls -la *.json && cat tsconfig.json
 
 # Build the application
 RUN npm run build
