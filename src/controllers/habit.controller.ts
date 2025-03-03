@@ -1,9 +1,9 @@
+import { isSameDay, parseISO, startOfDay } from "date-fns";
+import { toZonedTime } from "date-fns-tz";
 import { Response } from "express";
 import { AuthenticatedRequest } from "../middleware/auth.middleware";
 import { Habit } from "../models/habit.model";
 import { HabitBase } from "../types/habit.types";
-import { parseISO, startOfDay, isSameDay } from "date-fns";
-import { toZonedTime } from "date-fns-tz";
 
 // Define a type for validation errors
 interface ValidationError {

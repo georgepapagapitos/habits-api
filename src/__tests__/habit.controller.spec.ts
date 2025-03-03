@@ -238,7 +238,10 @@ describe("Habit Controller", () => {
       // Mock habit.isCompletedForDate to return true (already completed)
       const today = new Date();
       mockHabit.isCompletedForDate.mockReturnValue(true);
-      mockHabit.completedDates = [today, new Date(2022, 1, 1)];
+      mockHabit.completedDates = [
+        today.toISOString(),
+        new Date(2022, 1, 1).toISOString(),
+      ];
 
       // Call controller
       await habitController.toggleCompletion(
