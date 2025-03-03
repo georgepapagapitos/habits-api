@@ -1,9 +1,6 @@
 # Habits - API
 
-[![Test Suite](https://github.com/georgepapagapitos/hannahs-habits/actions/workflows/test.yml/badge.svg)](https://github.com/georgepapagapitos/hannahs-habits/actions/workflows/test.yml)
-[![Build and Deploy](https://github.com/georgepapagapitos/hannahs-habits/actions/workflows/build.yml/badge.svg)](https://github.com/georgepapagapitos/hannahs-habits/actions/workflows/build.yml)
-
-A RESTful API for the Hannah's Habits application built with Node.js, Express, TypeScript, and MongoDB.
+ØA RESTful API for the Habits application built with Node.js, Express, TypeScript, and MongoDB.
 
 ## Features
 
@@ -58,8 +55,8 @@ A RESTful API for the Hannah's Habits application built with Node.js, Express, T
 1. Clone the repository
 
    ```bash
-   git clone https://github.com/your-username/hannahs-habits.git
-   cd hannahs-habits/habits-api
+   git clone https://github.com/georgepapagapitos/habits-api.git
+   cd habits-api
    ```
 
 2. Install dependencies
