@@ -2,30 +2,28 @@ name: Backend CI
 
 on:
   push:
-    branches: [main]
+    branches-ignore: [main] # Run on all branches except main
   pull_request:
-    branches: [main]
+    branches: [main] # Run on PRs targeting main
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: "18"
+          node-version: "22"
           cache: "npm"
-          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        run: npm install --force
+        run: npm ci
 
-      # Skip linting for now since we've upgraded to ESLint v9
-      # - name: Run linting with auto-fix
-      #   run: npm run lint:fix || npm run lint -- --fix || npm run lint || true
+      - name: Run linting
+        run: npm run lint
 
       - name: Run type check
         run: npm run typecheck
