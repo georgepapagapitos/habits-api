@@ -1,4 +1,4 @@
-# Node modules
+# Node modules and build output
 **/node_modules
 **/dist
 
@@ -8,15 +8,26 @@
 .env.development.local
 .env.test.local
 .env.production.local
+.env.example
 
-# Git files
+# Git and CI files
 .git
 .gitignore
+.github
+.husky
+
+# Test files
+__test__
+coverage/
+coverage/**/*
+jest.config.js
 
 # Logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+*.log
+server.log
 
 # Editor directories and files
 .idea
@@ -30,3 +41,8 @@ yarn-error.log*
 # System files
 .DS_Store
 Thumbs.db
+
+# TypeScript configuration (not needed at runtime)
+tsconfig.json
+.eslintrc.json
+.prettierrc
