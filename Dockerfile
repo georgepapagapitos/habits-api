@@ -15,6 +15,9 @@ RUN npm ci
 # Copy source code
 COPY . .
 
+# Create a tsconfig.build.json for production build
+COPY tsconfig.build.json ./
+
 # Build the application
 RUN npm run build
 
