@@ -25,4 +25,7 @@ router.delete("/:id", habitController.deleteHabit);
 // PATCH toggle habit completion
 router.patch("/:id/toggle-completion", habitController.toggleCompletion);
 
+// PATCH reset habit (clear all completions and streak)
+router.patch("/:id/reset", habitController.resetHabit);
+
 export default router;
