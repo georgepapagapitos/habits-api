@@ -22,7 +22,7 @@ describe("Habit Controller", () => {
     _id: string;
     name: string;
     frequency: string[];
-    completedDates: string[];
+    completedDates: Date[];
     streak: number;
     userId: string;
     save: jest.Mock;
@@ -56,7 +56,7 @@ describe("Habit Controller", () => {
         _id: "habit123",
         name: "Test Habit",
         frequency: ["monday", "wednesday", "friday"],
-        completedDates: [new Date().toISOString()],
+        completedDates: [new Date()],
         streak: 1,
         userId: "user123",
       }),
@@ -238,10 +238,21 @@ describe("Habit Controller", () => {
       // Mock habit.isCompletedForDate to return true (already completed)
       const today = new Date();
       mockHabit.isCompletedForDate.mockReturnValue(true);
-      mockHabit.completedDates = [
-        today.toISOString(),
-        new Date(2022, 1, 1).toISOString(),
-      ];
+
+      // The test passes locally but fails in CI because the date filtering logic
+      // in the controller tries to filter based on isSameDay, and depending on
+      // the timezone where the test runs, this filtering may behave differently.
+      // To make the test more predictable, we'll create two dates that are clearly different days.
+      const yesterdayDate = new Date(today);
+      yesterdayDate.setDate(today.getDate() - 1);
+
+      mockHabit.completedDates = [today, yesterdayDate];
+
+      // Set mockRequest body date to match today
+      mockRequest.body = {
+        date: today.toISOString(),
+        timezone: "America/Chicago",
+      };
 
       // Call controller
       await habitController.toggleCompletion(

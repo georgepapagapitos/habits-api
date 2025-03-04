@@ -24,6 +24,59 @@ function isValidationError(error: unknown): error is ValidationError {
 }
 
 export const habitController = {
+  // Reset a habit by clearing completed dates and streak
+  resetHabit: async (
+    req: AuthenticatedRequest,
+    res: Response
+  ): Promise<void> => {
+    try {
+      if (!req.user || !req.user.id) {
+        res.status(401).json({
+          success: false,
+          error: "Not authorized",
+        });
+        return;
+      }
+
+      const habit = await Habit.findById(req.params.id);
+
+      if (!habit) {
+        res.status(404).json({
+          success: false,
+          error: "Habit not found",
+        });
+        return;
+      }
+
+      // Check if the habit belongs to the authenticated user
+      if (habit.userId !== req.user.id) {
+        res.status(403).json({
+          success: false,
+          error: "User not authorized to reset this habit",
+        });
+        return;
+      }
+
+      // Reset the habit by clearing completed dates and streak
+      habit.completedDates = [];
+      habit.streak = 0;
+
+      // Save the updated habit
+      await habit.save();
+
+      res.status(200).json({
+        success: true,
+        data: habit,
+      });
+    } catch (error) {
+      console.error("Error resetting habit:", error);
+      res.status(500).json({
+        success: false,
+        error: "Server Error",
+      });
+    }
+  },
+
   // Get all habits for the authenticated user
   getAllHabits: async (
     req: AuthenticatedRequest,
@@ -272,7 +325,7 @@ export const habitController = {
       const { date, timezone } = req.body;
 
       console.log(
-        `Toggle request received: id=${req.params.id}, date=${date}, timezone=${timezone}`
+        `Toggle request received: id=${req.params.id}, date=${date || "undefined"}, timezone=${timezone}`
       );
 
       if (!date) {
@@ -319,13 +372,22 @@ export const habitController = {
       console.log(
         `Date in user timezone (${userTimezone}): ${dateInUserTz.toISOString()}`
       );
-      console.log(
-        `Habit completed dates: ${habit.completedDates.map((d) => new Date(d).toISOString()).join(", ")}`
-      );
+
+      // Safely log completed dates, handling the case when the array might be empty
+      const completedDatesString =
+        habit.completedDates && habit.completedDates.length > 0
+          ? habit.completedDates
+              .map((d) => new Date(d).toISOString())
+              .join(", ")
+          : "none";
+
+      console.log(`Habit completed dates: ${completedDatesString}`);
 
       // Check if the date is already in completedDates
       const isCompleted = habit.isCompletedForDate(dateInUserTz);
-      console.log(`Is already completed for date: ${isCompleted}`);
+      console.log(
+        `Is already completed for date: ${isCompleted === true ? "true" : "false"}`
+      );
 
       if (isCompleted) {
         // Remove the date if already completed
