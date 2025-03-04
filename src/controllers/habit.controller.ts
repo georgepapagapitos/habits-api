@@ -272,7 +272,7 @@ export const habitController = {
       const { date, timezone } = req.body;
 
       console.log(
-        `Toggle request received: id=${req.params.id}, date=${date}, timezone=${timezone}`
+        `Toggle request received: id=${req.params.id}, date=${date || "undefined"}, timezone=${timezone}`
       );
 
       if (!date) {
@@ -319,13 +319,22 @@ export const habitController = {
       console.log(
         `Date in user timezone (${userTimezone}): ${dateInUserTz.toISOString()}`
       );
-      console.log(
-        `Habit completed dates: ${habit.completedDates.map((d) => new Date(d).toISOString()).join(", ")}`
-      );
+
+      // Safely log completed dates, handling the case when the array might be empty
+      const completedDatesString =
+        habit.completedDates && habit.completedDates.length > 0
+          ? habit.completedDates
+              .map((d) => new Date(d).toISOString())
+              .join(", ")
+          : "none";
+
+      console.log(`Habit completed dates: ${completedDatesString}`);
 
       // Check if the date is already in completedDates
       const isCompleted = habit.isCompletedForDate(dateInUserTz);
-      console.log(`Is already completed for date: ${isCompleted}`);
+      console.log(
+        `Is already completed for date: ${isCompleted === true ? "true" : "false"}`
+      );
 
       if (isCompleted) {
         // Remove the date if already completed
