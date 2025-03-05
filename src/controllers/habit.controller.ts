@@ -4,6 +4,13 @@ import { Response } from "express";
 import { AuthenticatedRequest } from "../middleware/auth.middleware";
 import { Habit } from "../models/habit.model";
 import { HabitBase } from "../types/habit.types";
+import {
+  sendErrorResponse,
+  createNotFoundError,
+  createUnauthorizedError,
+  createForbiddenError,
+  createValidationError,
+} from "../utils/error.utils";
 
 // Define a type for validation errors
 interface ValidationError {
@@ -31,29 +38,20 @@ export const habitController = {
   ): Promise<void> => {
     try {
       if (!req.user || !req.user.id) {
-        res.status(401).json({
-          success: false,
-          error: "Not authorized",
-        });
+        sendErrorResponse(res, 401, "Not authorized");
         return;
       }
 
       const habit = await Habit.findById(req.params.id);
 
       if (!habit) {
-        res.status(404).json({
-          success: false,
-          error: "Habit not found",
-        });
+        sendErrorResponse(res, 404, `Habit with ID ${req.params.id} not found`);
         return;
       }
 
       // Check if the habit belongs to the authenticated user
       if (habit.userId !== req.user.id) {
-        res.status(403).json({
-          success: false,
-          error: "User not authorized to reset this habit",
-        });
+        sendErrorResponse(res, 403, "User not authorized to reset this habit");
         return;
       }
 
@@ -70,10 +68,7 @@ export const habitController = {
       });
     } catch (error) {
       console.error("Error resetting habit:", error);
-      res.status(500).json({
-        success: false,
-        error: "Server Error",
-      });
+      sendErrorResponse(res, 500, "Server Error", error);
     }
   },
 
@@ -84,10 +79,7 @@ export const habitController = {
   ): Promise<void> => {
     try {
       if (!req.user || !req.user.id) {
-        res.status(401).json({
-          success: false,
-          error: "Not authorized",
-        });
+        sendErrorResponse(res, 401, "Not authorized");
         return;
       }
 
@@ -102,10 +94,7 @@ export const habitController = {
         data: habits,
       });
     } catch (error) {
-      res.status(500).json({
-        success: false,
-        error: "Server Error",
-      });
+      sendErrorResponse(res, 500, "Error fetching habits", error);
     }
   },
 
@@ -116,29 +105,20 @@ export const habitController = {
   ): Promise<void> => {
     try {
       if (!req.user || !req.user.id) {
-        res.status(401).json({
-          success: false,
-          error: "Not authorized",
-        });
+        sendErrorResponse(res, 401, "Not authorized");
         return;
       }
 
       const habit = await Habit.findById(req.params.id);
 
       if (!habit) {
-        res.status(404).json({
-          success: false,
-          error: "Habit not found",
-        });
+        sendErrorResponse(res, 404, `Habit with ID ${req.params.id} not found`);
         return;
       }
 
       // Check if the habit belongs to the authenticated user
       if (habit.userId !== req.user.id) {
-        res.status(403).json({
-          success: false,
-          error: "Not authorized to access this habit",
-        });
+        sendErrorResponse(res, 403, "Not authorized to access this habit");
         return;
       }
 
@@ -147,10 +127,7 @@ export const habitController = {
         data: habit,
       });
     } catch (error) {
-      res.status(500).json({
-        success: false,
-        error: "Server Error",
-      });
+      sendErrorResponse(res, 500, "Error fetching habit", error);
     }
   },
 
@@ -161,10 +138,7 @@ export const habitController = {
   ): Promise<void> => {
     try {
       if (!req.user || !req.user.id) {
-        res.status(401).json({
-          success: false,
-          error: "Not authorized",
-        });
+        sendErrorResponse(res, 401, "Not authorized");
         return;
       }
 
@@ -182,18 +156,11 @@ export const habitController = {
     } catch (error) {
       if (isValidationError(error)) {
         const messages = Object.values(error.errors).map((err) => err.message);
-
-        res.status(400).json({
-          success: false,
-          error: messages,
-        });
+        sendErrorResponse(res, 400, "Validation failed", messages);
         return;
       }
 
-      res.status(500).json({
-        success: false,
-        error: "Server Error",
-      });
+      sendErrorResponse(res, 500, "Error creating habit", error);
     }
   },
 
@@ -204,10 +171,7 @@ export const habitController = {
   ): Promise<void> => {
     try {
       if (!req.user || !req.user.id) {
-        res.status(401).json({
-          success: false,
-          error: "Not authorized",
-        });
+        sendErrorResponse(res, 401, "Not authorized");
         return;
       }
 
@@ -217,19 +181,13 @@ export const habitController = {
       const existingHabit = await Habit.findById(req.params.id);
 
       if (!existingHabit) {
-        res.status(404).json({
-          success: false,
-          error: "Habit not found",
-        });
+        sendErrorResponse(res, 404, `Habit with ID ${req.params.id} not found`);
         return;
       }
 
       // Check if the habit belongs to the authenticated user
       if (existingHabit.userId !== req.user.id) {
-        res.status(403).json({
-          success: false,
-          error: "User not authorized to update this habit",
-        });
+        sendErrorResponse(res, 403, "User not authorized to update this habit");
         return;
       }
 
@@ -245,18 +203,11 @@ export const habitController = {
     } catch (error) {
       if (isValidationError(error)) {
         const messages = Object.values(error.errors).map((err) => err.message);
-
-        res.status(400).json({
-          success: false,
-          error: messages,
-        });
+        sendErrorResponse(res, 400, "Validation failed", messages);
         return;
       }
 
-      res.status(500).json({
-        success: false,
-        error: "Server Error",
-      });
+      sendErrorResponse(res, 500, "Error updating habit", error);
     }
   },
 
@@ -267,29 +218,20 @@ export const habitController = {
   ): Promise<void> => {
     try {
       if (!req.user || !req.user.id) {
-        res.status(401).json({
-          success: false,
-          error: "Not authorized",
-        });
+        sendErrorResponse(res, 401, "Not authorized");
         return;
       }
 
       const habit = await Habit.findById(req.params.id);
 
       if (!habit) {
-        res.status(404).json({
-          success: false,
-          error: "Habit not found",
-        });
+        sendErrorResponse(res, 404, `Habit with ID ${req.params.id} not found`);
         return;
       }
 
       // Check if the habit belongs to the authenticated user
       if (habit.userId !== req.user.id) {
-        res.status(403).json({
-          success: false,
-          error: "User not authorized to delete this habit",
-        });
+        sendErrorResponse(res, 403, "User not authorized to delete this habit");
         return;
       }
 
@@ -301,10 +243,7 @@ export const habitController = {
         data: {},
       });
     } catch (error) {
-      res.status(500).json({
-        success: false,
-        error: "Server Error",
-      });
+      sendErrorResponse(res, 500, "Error deleting habit", error);
     }
   },
 
@@ -315,10 +254,7 @@ export const habitController = {
   ): Promise<void> => {
     try {
       if (!req.user || !req.user.id) {
-        res.status(401).json({
-          success: false,
-          error: "Not authorized",
-        });
+        sendErrorResponse(res, 401, "Not authorized");
         return;
       }
 
@@ -329,10 +265,7 @@ export const habitController = {
       );
 
       if (!date) {
-        res.status(400).json({
-          success: false,
-          error: "Date is required",
-        });
+        sendErrorResponse(res, 400, "Date is required");
         return;
       }
 
@@ -344,19 +277,13 @@ export const habitController = {
       const habit = await Habit.findById(req.params.id);
 
       if (!habit) {
-        res.status(404).json({
-          success: false,
-          error: "Habit not found",
-        });
+        sendErrorResponse(res, 404, `Habit with ID ${req.params.id} not found`);
         return;
       }
 
       // Check if the habit belongs to the authenticated user
       if (habit.userId !== req.user.id) {
-        res.status(403).json({
-          success: false,
-          error: "User not authorized to update this habit",
-        });
+        sendErrorResponse(res, 403, "User not authorized to update this habit");
         return;
       }
 
@@ -417,24 +344,12 @@ export const habitController = {
           data: savedHabit,
         });
       } catch (saveError) {
-        const errorMessage =
-          saveError instanceof Error ? saveError.message : String(saveError);
         console.error("Error saving habit:", saveError);
-        res.status(500).json({
-          success: false,
-          error: "Error saving habit",
-          details: errorMessage,
-        });
+        sendErrorResponse(res, 500, "Error saving habit", saveError);
       }
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
       console.error("Toggle completion error:", error);
-      res.status(500).json({
-        success: false,
-        error: "Server Error",
-        details: errorMessage,
-      });
+      sendErrorResponse(res, 500, "Error toggling habit completion", error);
     }
   },
 };

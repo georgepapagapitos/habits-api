@@ -1,18 +1,12 @@
 import { Response } from "express";
-
-// Create mock for the error utilities to test
-const sendErrorResponse = (
-  res: Response,
-  statusCode: number,
-  message: string,
-  error?: unknown
-) => {
-  return res.status(statusCode).json({
-    success: false,
-    message,
-    error: error || "Server Error",
-  });
-};
+import {
+  sendErrorResponse,
+  createNotFoundError,
+  createValidationError,
+  createUnauthorizedError,
+  createForbiddenError,
+  createConflictError,
+} from "../utils/error.utils";
 
 describe("Error Utilities", () => {
   let mockResponse: Partial<Response>;
@@ -93,6 +87,53 @@ describe("Error Utilities", () => {
       success: false,
       message: "Internal server error",
       error: errorWithMessage,
+    });
+  });
+
+  // Test the error creator functions
+  describe("Error Creator Functions", () => {
+    test("createNotFoundError should create a 404 AppError with resource name", () => {
+      const error = createNotFoundError("User");
+      expect(error.statusCode).toBe(404);
+      expect(error.message).toBe("User not found");
+    });
+
+    test("createNotFoundError should include ID if provided", () => {
+      const error = createNotFoundError("Habit", "123");
+      expect(error.statusCode).toBe(404);
+      expect(error.message).toBe("Habit with ID 123 not found");
+    });
+
+    test("createValidationError should create a 400 AppError", () => {
+      const error = createValidationError("Name is required");
+      expect(error.statusCode).toBe(400);
+      expect(error.message).toBe("Name is required");
+    });
+
+    test("createUnauthorizedError should create a 401 AppError", () => {
+      const error = createUnauthorizedError();
+      expect(error.statusCode).toBe(401);
+      expect(error.message).toBe("Unauthorized access");
+    });
+
+    test("createUnauthorizedError should accept custom message", () => {
+      const error = createUnauthorizedError("Invalid credentials");
+      expect(error.statusCode).toBe(401);
+      expect(error.message).toBe("Invalid credentials");
+    });
+
+    test("createForbiddenError should create a 403 AppError", () => {
+      const error = createForbiddenError();
+      expect(error.statusCode).toBe(403);
+      expect(error.message).toBe(
+        "Forbidden: You don't have permission to access this resource"
+      );
+    });
+
+    test("createConflictError should create a 409 AppError", () => {
+      const error = createConflictError("Username already exists");
+      expect(error.statusCode).toBe(409);
+      expect(error.message).toBe("Username already exists");
     });
   });
 });
