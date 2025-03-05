@@ -4,12 +4,7 @@ import jwt from "jsonwebtoken";
 import { AuthenticatedRequest } from "../middleware/auth.middleware";
 import { User } from "../models/user.model";
 import { AuthRequest, AuthResponse, LoginRequest } from "../types/user.types";
-import {
-  sendErrorResponse,
-  createConflictError,
-  createNotFoundError,
-  createUnauthorizedError,
-} from "../utils/error.utils";
+import { sendErrorResponse } from "../utils/error.utils";
 
 // Generate JWT Token
 const generateToken = (id: string, username: string, email: string) => {

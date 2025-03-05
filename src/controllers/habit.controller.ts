@@ -4,13 +4,7 @@ import { Response } from "express";
 import { AuthenticatedRequest } from "../middleware/auth.middleware";
 import { Habit } from "../models/habit.model";
 import { HabitBase } from "../types/habit.types";
-import {
-  sendErrorResponse,
-  createNotFoundError,
-  createUnauthorizedError,
-  createForbiddenError,
-  createValidationError,
-} from "../utils/error.utils";
+import { sendErrorResponse } from "../utils/error.utils";
 
 // Define a type for validation errors
 interface ValidationError {
