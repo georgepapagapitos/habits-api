@@ -80,7 +80,8 @@ describe("Habit Controller", () => {
       expect(mockResponse.status).toHaveBeenCalledWith(401);
       expect(mockResponse.json).toHaveBeenCalledWith({
         success: false,
-        error: "Not authorized",
+        message: "Not authorized",
+        error: "Server Error",
       });
       expect(Habit.find).not.toHaveBeenCalled();
     });
@@ -126,7 +127,8 @@ describe("Habit Controller", () => {
       expect(mockResponse.status).toHaveBeenCalledWith(500);
       expect(mockResponse.json).toHaveBeenCalledWith({
         success: false,
-        error: "Server Error",
+        message: "Error fetching habits",
+        error: expect.any(Error),
       });
     });
   });
@@ -157,7 +159,8 @@ describe("Habit Controller", () => {
       expect(mockResponse.status).toHaveBeenCalledWith(401);
       expect(mockResponse.json).toHaveBeenCalledWith({
         success: false,
-        error: "Not authorized",
+        message: "Not authorized",
+        error: "Server Error",
       });
     });
 
@@ -175,7 +178,8 @@ describe("Habit Controller", () => {
       expect(mockResponse.status).toHaveBeenCalledWith(400);
       expect(mockResponse.json).toHaveBeenCalledWith({
         success: false,
-        error: "Date is required",
+        message: "Date is required",
+        error: "Server Error",
       });
     });
 
@@ -193,7 +197,8 @@ describe("Habit Controller", () => {
       expect(mockResponse.status).toHaveBeenCalledWith(404);
       expect(mockResponse.json).toHaveBeenCalledWith({
         success: false,
-        error: "Habit not found",
+        message: "Habit with ID habit123 not found",
+        error: "Server Error",
       });
     });
 
@@ -211,7 +216,8 @@ describe("Habit Controller", () => {
       expect(mockResponse.status).toHaveBeenCalledWith(403);
       expect(mockResponse.json).toHaveBeenCalledWith({
         success: false,
-        error: "User not authorized to update this habit",
+        message: "User not authorized to update this habit",
+        error: "Server Error",
       });
     });
 
@@ -282,8 +288,8 @@ describe("Habit Controller", () => {
       expect(mockResponse.status).toHaveBeenCalledWith(500);
       expect(mockResponse.json).toHaveBeenCalledWith({
         success: false,
-        error: "Error saving habit",
-        details: "Save error",
+        message: "Error saving habit",
+        error: expect.any(Error),
       });
     });
   });
