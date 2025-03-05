@@ -13,7 +13,7 @@ app.use(
   cors({
     origin:
       process.env.NODE_ENV === "production"
-        ? ["http://habits.rubygal.com"] // Restrict in production
+        ? ["http://habits.rubygal.com", "https://habits.rubygal.com"] // Production
         : ["http://localhost:3000", "http://192.168.0.20:3000"], // Allow local development
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     credentials: true,

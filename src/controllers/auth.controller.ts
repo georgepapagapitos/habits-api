@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken";
 import { AuthenticatedRequest } from "../middleware/auth.middleware";
 import { User } from "../models/user.model";
 import { AuthRequest, AuthResponse, LoginRequest } from "../types/user.types";
+import { sendErrorResponse } from "../utils/error.utils";
 
 // Generate JWT Token
 const generateToken = (id: string, username: string, email: string) => {
@@ -26,9 +27,9 @@ export const registerUser = async (req: Request, res: Response) => {
     });
 
     if (existingUser) {
-      res.status(400).json({
-        message: "User already exists",
-        field: existingUser.email === email ? "email" : "username",
+      const field = existingUser.email === email ? "email" : "username";
+      sendErrorResponse(res, 409, `User with this ${field} already exists`, {
+        field,
       });
       return;
     }
@@ -59,7 +60,7 @@ export const registerUser = async (req: Request, res: Response) => {
     res.status(201).json(response);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Server error during registration" });
+    sendErrorResponse(res, 500, "Server error during registration", error);
   }
 };
 
@@ -73,10 +74,7 @@ export const loginUser = async (req: Request, res: Response) => {
     const user = await User.findOne({ email });
 
     if (!user) {
-      res.status(400).json({
-        message: "Invalid credentials",
-        field: "email",
-      });
+      sendErrorResponse(res, 401, "Invalid credentials", { field: "email" });
       return;
     }
 
@@ -84,10 +82,7 @@ export const loginUser = async (req: Request, res: Response) => {
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
-      res.status(400).json({
-        message: "Invalid credentials",
-        field: "password",
-      });
+      sendErrorResponse(res, 401, "Invalid credentials", { field: "password" });
       return;
     }
 
@@ -106,7 +101,7 @@ export const loginUser = async (req: Request, res: Response) => {
     res.json(response);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Server error during login" });
+    sendErrorResponse(res, 500, "Server error during login", error);
   }
 };
 
@@ -118,14 +113,14 @@ export const getCurrentUser = async (
 ) => {
   try {
     if (!req.user || !req.user.id) {
-      res.status(401).json({ message: "Not authorized" });
+      sendErrorResponse(res, 401, "Not authorized");
       return;
     }
 
     const user = await User.findById(req.user.id).select("-password");
 
     if (!user) {
-      res.status(404).json({ message: "User not found" });
+      sendErrorResponse(res, 404, "User not found");
       return;
     }
 
@@ -136,6 +131,6 @@ export const getCurrentUser = async (
     });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Server error fetching user" });
+    sendErrorResponse(res, 500, "Server error fetching user", error);
   }
 };

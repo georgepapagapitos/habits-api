@@ -1,4 +1,5 @@
 import { NextFunction, Request, Response } from "express";
+import { sendErrorResponse } from "../utils/error.utils";
 
 // Custom error class
 export class AppError extends Error {
@@ -27,29 +28,27 @@ export const errorHandler = (
   // Default error values
   let statusCode = 500;
   let message = "Something went wrong";
-  let status = "error";
-  const stack = process.env.NODE_ENV === "production" ? {} : err.stack;
+  const stack = process.env.NODE_ENV === "production" ? undefined : err.stack;
 
   // If it's our custom error, use its properties
   if ("statusCode" in err) {
     statusCode = err.statusCode;
     message = err.message;
-    status = err.status;
   } else if (err.name === "ValidationError") {
     statusCode = 400;
     message = err.message;
-    status = "fail";
   } else if (err.name === "CastError") {
     statusCode = 400;
     message = "Invalid ID format";
-    status = "fail";
   }
 
-  res.status(statusCode).json({
-    status,
-    message,
-    ...(process.env.NODE_ENV === "development" && { stack }),
-  });
+  // Use the sendErrorResponse utility
+  const errorDetails =
+    process.env.NODE_ENV === "development"
+      ? { stack, originalError: err }
+      : undefined;
+
+  sendErrorResponse(res, statusCode, message, errorDetails);
 };
 
 // 404 handler - called when no routes match
