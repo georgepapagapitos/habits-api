@@ -15,7 +15,8 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "format": "prettier --write \"src/**/*.{ts,js}\"",
-    "prepare": "is-ci || husky"
+    "prepare": "is-ci || husky",
+    "seed": "ts-node scripts/seed-test-data.ts"
   },
   "keywords": [
     "habits",
