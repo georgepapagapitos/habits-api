@@ -1,11 +1,7 @@
 {
-  "extends": "./tsconfig.app.json",
+  "extends": "./tsconfig.json",
   "compilerOptions": {
-    "types": ["jest", "node"],
-    "skipLibCheck": true,
-    "module": "commonjs",
-    "moduleResolution": "node",
-    "esModuleInterop": true
+    "types": ["jest", "node"]
   },
   "include": ["src/**/*.test.ts", "src/**/*.spec.ts", "src/__tests__/**/*.ts"],
   "exclude": []
