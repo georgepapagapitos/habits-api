@@ -53,18 +53,18 @@ This guide explains how to test the habit completion feature, specifically aroun
    - Observe that the streak increases
    - Check the UI feedback message confirming this adds to the streak
 
-   b. Verifying streak maintenance:
+   b. Verifying streak breaks when due days are missed:
 
    - Find "Work on Side Project" (weekdays only)
-   - Complete it on a Saturday or Sunday
+   - Complete it on a Saturday (non-due day)
    - Verify the streak increases
-   - Skip the following Monday
-   - Notice the streak does not break because of the weekend completion
+   - Skip the following Monday (due day)
+   - Check that the streak resets to 0, even though you completed the habit on Saturday
 
    c. Testing the updated UI feedback:
 
    - Complete any habit on a non-due day
-   - Check that the message confirms it adds to your streak
+   - Check that the message confirms it adds to your streak but warns that missing due days will still break it
 
 ## Verifying in the Database
 
@@ -75,10 +75,10 @@ If you want to verify the data directly in MongoDB:
 3. When habits are completed on non-due days, they should:
    - Be stored in the `completedDates` array
    - Contribute to the streak value
-   - Prevent the streak from breaking if a due day is missed
+   - NOT prevent the streak from breaking if a due day is missed
 
 ## Expected Behavior
 
 - Completing a habit on ANY day (due or not) should increase the streak
-- Missing a due day should NOT break the streak if there are completions on other days
-- The UI should clearly indicate when a non-due day completion is recorded
+- Missing a due day WILL break the streak, even if there are completions on non-due days
+- The UI should clearly indicate when a non-due day completion is recorded and explain that missing due days will still break the streak

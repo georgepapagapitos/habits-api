@@ -250,20 +250,11 @@ habitSchema.pre("save", function (next) {
           lastNonDueDateCompleted = false; // Reset non-due date flag when a due date is completed
           console.log(`  Due date completed, added to streak, now: ${streak}`);
         } else {
-          // This due date was missed - only break the streak if we haven't completed
-          // a non-due date since the last due date
-          if (!lastNonDueDateCompleted) {
-            console.log(
-              `  Streak broken on ${checkDate.toISOString()} - missed due date with no completed non-due dates`
-            );
-            break;
-          } else {
-            console.log(
-              `  Due date missed, but non-due date was completed in between, continuing`
-            );
-            // Reset since we've "used up" the non-due date completion
-            lastNonDueDateCompleted = false;
-          }
+          // This due date was missed - break the streak
+          console.log(
+            `  Streak broken on ${checkDate.toISOString()} - missed due date`
+          );
+          break;
         }
       } else if (wasCompleted) {
         // This is a non-due date but was completed anyway
