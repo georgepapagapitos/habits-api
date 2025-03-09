@@ -121,9 +121,6 @@ habitSchema.methods.isCompletedForDate = function (date: Date): boolean {
 // Pre-save middleware to update streak
 habitSchema.pre("save", function (next) {
   if (this.isModified("completedDates")) {
-    // Import date-fns and date-fns-tz functions
-    // Functions are imported at the top of the file
-
     // Get the user's timezone or default to UTC
     const timezone = this.userTimezone || "UTC";
 
@@ -200,74 +197,129 @@ habitSchema.pre("save", function (next) {
     );
     console.log(`Is completed today: ${isCompletedToday}`);
 
-    // 1. If due today but not completed, we'll calculate the streak based on previous completions
-    // (We're removing the immediate streak reset when a due date is missed)
-    if (isDueToday && !isCompletedToday) {
-      console.log(
-        "Due today but not completed, will calculate streak based on previous completions"
-      );
-    }
-
-    // 2. Start with 0 or 1 depending on today's completion
-    // Non-due day completions should add to the streak too
-    let streak = isCompletedToday ? 1 : 0;
-    console.log(
-      `Starting streak count: ${streak} (isCompletedToday: ${isCompletedToday}, isDueToday: ${isDueToday})`
+    // New approach for streak calculation:
+    // 1. Find the most recent completion
+    const mostRecentCompletion = completedDatesInTz[0];
+    const yesterday = subDays(todayStart, 1);
+    const isCompletedYesterday = completedDatesInTz.some((date) =>
+      isSameDay(date, yesterday)
     );
 
-    // 3. Go backwards through the calendar, checking each day
-    let checkDate = isCompletedToday
-      ? subDays(todayStart, 1) // Start from yesterday if today is completed
-      : todayStart; // Start from today otherwise
+    // Start with current day's completion state
+    let streak = isCompletedToday ? 1 : 0;
+    console.log(`Initial streak based on today's completion: ${streak}`);
 
-    let consecutiveDaysChecked = 0;
-    let lastDueDateCompleted = isCompletedToday && isDueToday;
-    let lastNonDueDateCompleted = isCompletedToday && !isDueToday;
-
-    // Only go back 365 days at most (to prevent infinite loops)
-    while (consecutiveDaysChecked < 365) {
-      consecutiveDaysChecked++;
-
-      // Check if this day is a due date
-      const dayIndex = getDay(checkDate);
-      const isDueDate = frequencyIndices.includes(dayIndex);
-
-      // Check if this date was completed
-      const wasCompleted = completedDatesInTz.some((date) =>
-        isSameDay(date, checkDate)
+    // If not completed today but completed yesterday, should still count as a streak
+    // Let's determine if we have a valid streak to continue
+    if (!isCompletedToday && mostRecentCompletion) {
+      const daysSinceLastCompletion = Math.floor(
+        (todayStart.getTime() - mostRecentCompletion.getTime()) /
+          (1000 * 60 * 60 * 24)
       );
 
-      console.log(
-        `Checking ${checkDate.toISOString()} (${daysOfWeek[dayIndex]}): due=${isDueDate}, completed=${wasCompleted}`
-      );
+      console.log(`Days since last completion: ${daysSinceLastCompletion}`);
 
-      if (isDueDate) {
-        // This is a due date
-        if (wasCompleted) {
-          // This due date was completed, add to streak
-          streak++;
-          lastDueDateCompleted = true;
-          lastNonDueDateCompleted = false; // Reset non-due date flag when a due date is completed
-          console.log(`  Due date completed, added to streak, now: ${streak}`);
-        } else {
-          // This due date was missed - break the streak
-          console.log(
-            `  Streak broken on ${checkDate.toISOString()} - missed due date`
-          );
-          break;
-        }
-      } else if (wasCompleted) {
-        // This is a non-due date but was completed anyway
-        // Non-due dates should add to streak
-        streak++;
-        lastNonDueDateCompleted = true;
-        console.log(
-          `  Non-due date completed, added to streak, now: ${streak}`
-        );
+      // If completed yesterday, start streak at 1 if due today
+      if (isCompletedYesterday && isDueToday) {
+        streak = 1;
+        console.log(`Completed yesterday and due today, starting streak at 1`);
       }
+      // If more than one day has passed since last completion
+      else if (daysSinceLastCompletion > 1) {
+        // Check if there were any due dates missed between last completion and today
+        let missedDueDate = false;
+        let checkDate = yesterday;
+        const lastCompletionDate = startOfDay(mostRecentCompletion);
 
-      // Move to the previous day
-      checkDate = subDays(checkDate, 1);
+        // Check each day between yesterday and last completion
+        while (!isSameDay(checkDate, lastCompletionDate) && !missedDueDate) {
+          const checkDayIndex = getDay(checkDate);
+          const isDueOnCheckDate = frequencyIndices.includes(checkDayIndex);
+          const isCompletedOnCheckDate = completedDatesInTz.some((date) =>
+            isSameDay(date, checkDate)
+          );
+
+          console.log(
+            `Checking ${checkDate.toISOString()} (${daysOfWeek[checkDayIndex]}): due=${isDueOnCheckDate}, completed=${isCompletedOnCheckDate}`
+          );
+
+          // If this was a due date but not completed, streak is broken
+          if (isDueOnCheckDate && !isCompletedOnCheckDate) {
+            missedDueDate = true;
+            console.log(
+              `Missed due date found on ${checkDate.toISOString()}, streak broken`
+            );
+          }
+
+          // Move to the previous day
+          checkDate = subDays(checkDate, 1);
+        }
+
+        // If no missed due dates, set streak to 1 to encourage continuing
+        if (!missedDueDate) {
+          streak = 1;
+          console.log(
+            `No missed due dates between last completion and today, streak set to 1`
+          );
+        }
+      }
+    }
+
+    // If we already determined streak should be 1 due to yesterday's completion, set streak and continue
+    if (streak === 1 && isCompletedYesterday && isDueToday) {
+      console.log(`Setting streak=1 for yesterday's completion (due today)`);
+      this.streak = streak;
+      return next();
+    }
+
+    // Count the streak going backward from the most recent completion
+    if (streak > 0 || isCompletedToday) {
+      // Adjust starting point for backward count
+      let checkDate = isCompletedToday ? yesterday : mostRecentCompletion;
+      let consecutiveDaysChecked = 0;
+
+      // Only go back 365 days at most (to prevent infinite loops)
+      while (consecutiveDaysChecked < 365 && checkDate) {
+        consecutiveDaysChecked++;
+
+        // Check if this day is a due date
+        const dayIndex = getDay(checkDate);
+        const isDueDate = frequencyIndices.includes(dayIndex);
+
+        // Check if this date was completed
+        const wasCompleted = completedDatesInTz.some((date) =>
+          isSameDay(date, checkDate)
+        );
+
+        console.log(
+          `Checking for streak ${checkDate.toISOString()} (${daysOfWeek[dayIndex]}): due=${isDueDate}, completed=${wasCompleted}`
+        );
+
+        if (isDueDate) {
+          // This is a due date
+          if (wasCompleted) {
+            // This due date was completed, add to streak
+            streak++;
+            console.log(`Due date completed, added to streak, now: ${streak}`);
+          } else {
+            // This due date was missed - break the streak
+            console.log(
+              `Streak broken on ${checkDate.toISOString()} - missed due date`
+            );
+            break;
+          }
+        } else if (wasCompleted) {
+          // This is a non-due date but was completed anyway (bonus)
+          // Non-due dates should add to streak
+          streak++;
+          console.log(
+            `Non-due date completed (bonus), added to streak, now: ${streak}`
+          );
+        }
+
+        // Move to the previous day
+        checkDate = subDays(checkDate, 1);
+      }
     }
 
     console.log(`Final streak calculation: ${streak}`);
