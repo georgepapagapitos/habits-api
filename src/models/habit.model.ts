@@ -265,10 +265,11 @@ habitSchema.pre("save", function (next) {
       }
     }
 
-    // If we already determined streak should be 1 due to yesterday's completion, return early
+    // If we already determined streak should be 1 due to yesterday's completion, set streak and continue
     if (streak === 1 && isCompletedYesterday && isDueToday) {
-      console.log(`Returning streak=1 for yesterday's completion (due today)`);
-      return streak;
+      console.log(`Setting streak=1 for yesterday's completion (due today)`);
+      this.streak = streak;
+      return next();
     }
 
     // Count the streak going backward from the most recent completion
