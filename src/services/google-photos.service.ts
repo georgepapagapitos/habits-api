@@ -123,16 +123,22 @@ class GooglePhotosService {
   getAuthUrl(state?: string): string {
     const scopes = ["https://www.googleapis.com/auth/photoslibrary.readonly"];
 
+    // CRITICAL: DO NOT USE PKCE AT ALL, it's causing problems
     // The key to getting refresh tokens is using both:
     // 1. access_type=offline
     // 2. prompt=consent
-    // This forces the consent screen to appear and guarantees a refresh token
+    console.log(
+      "Generating standard OAuth URL (NO PKCE), with state:",
+      state || "none"
+    );
+
     return this.oauth2Client.generateAuthUrl({
       access_type: "offline",
       scope: scopes,
       prompt: "consent", // Critical - forces consent screen to get refresh token
       state: state,
       include_granted_scopes: true,
+      // NO CODE CHALLENGE OR PKCE PARAMETERS
     });
   }
 
@@ -158,8 +164,16 @@ class GooglePhotosService {
         redirectUri: GOOGLE_REDIRECT_URI,
       });
 
-      // Direct token exchange
-      const { tokens } = await this.oauth2Client.getToken(code);
+      // IMPORTANT: Create a fresh oauth2client for this exchange to avoid any
+      // lingering state or code verifier expectations
+      const freshOAuth2Client = new google.auth.OAuth2(
+        GOOGLE_CLIENT_ID,
+        GOOGLE_CLIENT_SECRET,
+        GOOGLE_REDIRECT_URI
+      );
+
+      // Direct token exchange with fresh client
+      const { tokens } = await freshOAuth2Client.getToken(code);
 
       console.log("Received tokens:", {
         access_token: tokens.access_token ? "PRESENT" : "MISSING",

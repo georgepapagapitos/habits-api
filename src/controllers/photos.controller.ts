@@ -14,57 +14,13 @@ const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
 // "{FRONTEND_URL}/photos/callback" e.g., "https://habits.rubygal.com/photos/callback"
 // And this MUST match the frontend route in AppRoutes.tsx that renders GoogleCallbackHandler
 
-// Redis/Session client for storing PKCE verifiers (defined in app.ts)
-// For simplicity, we're using a Map for in-memory storage in this example
-// In production, use Redis or another session store
-const codeVerifierStore = new Map<
-  string,
-  { verifier: string; expires: number }
->();
-
-/**
- * Store a code verifier with TTL
- * @param state The state parameter to use as key
- * @param verifier The code verifier to store
- * @param ttlSeconds Time to live in seconds (default: 10 minutes)
- */
-function storeCodeVerifier(
-  state: string,
-  verifier: string,
-  ttlSeconds = 600
-): void {
-  codeVerifierStore.set(state, {
-    verifier,
-    expires: Date.now() + ttlSeconds * 1000,
-  });
-}
-
-/**
- * Get and delete a code verifier
- * @param state The state parameter used as key
- * @returns The code verifier or undefined if not found or expired
- */
-function getAndDeleteCodeVerifier(state: string): string | undefined {
-  const entry = codeVerifierStore.get(state);
-
-  if (!entry) {
-    return undefined;
-  }
-
-  // Clean up expired entries
-  if (entry.expires < Date.now()) {
-    codeVerifierStore.delete(state);
-    return undefined;
-  }
-
-  // Delete after retrieval
-  codeVerifierStore.delete(state);
-  return entry.verifier;
-}
+// We are no longer using PKCE or code verifiers
+// IMPORTANT: Using the standard OAuth flow for better compatibility
+// State parameter is still used for CSRF protection
 
 /**
  * Generate Google Photos authorization URL
- * Implements PKCE for enhanced security
+ * Uses standard OAuth flow (no PKCE) for better compatibility
  */
 export const getAuthUrl = (
   req: Request,
@@ -80,12 +36,8 @@ export const getAuthUrl = (
     // Generate a random state parameter for CSRF protection
     const state = crypto.randomBytes(16).toString("hex");
 
-    // Get auth URL with PKCE
-    const { authUrl, codeVerifier } =
-      googlePhotosService.getAuthUrlWithPKCE(state);
-
-    // Store the code verifier temporarily
-    storeCodeVerifier(state, codeVerifier);
+    // Get standard OAuth URL (no PKCE)
+    const authUrl = googlePhotosService.getAuthUrl(state);
 
     // Return auth URL with state parameter
     res.json({
@@ -102,7 +54,7 @@ export const getAuthUrl = (
 
 /**
  * Handle OAuth callback and save tokens to user (from request body)
- * Supports PKCE for enhanced security
+ * Standard OAuth flow (no PKCE)
  */
 export const handleAuthCallback = async (
   req: AuthenticatedRequest,
@@ -181,7 +133,7 @@ export const handleAuthCallback = async (
 /**
  * Handle OAuth callback with query parameters (for direct browser redirects)
  * Redirects back to the frontend with the authorization code or error
- * Supports PKCE by preserving state parameter
+ * Preserves state parameter for CSRF protection
  */
 export const handleAuthCallbackRedirect = async (
   req: Request,
@@ -472,10 +424,15 @@ export const disconnectGooglePhotos = async (
       return;
     }
 
-    // Try a different approach - Update directly
+    // We need to completely clear the googlePhotos data
+    // Instead of $unset, let's use $set with null to fully replace the field
     const result = await User.updateOne(
       { _id: userId },
-      { $unset: { googlePhotos: "" } }
+      {
+        $set: {
+          googlePhotos: null,
+        },
+      }
     );
 
     console.log("MongoDB update result:", result);
