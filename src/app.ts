@@ -1,6 +1,7 @@
 import cors from "cors";
 import express, { Express } from "express";
 import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import { errorHandler, notFoundHandler } from "./middleware/error.middleware";
 import routes from "./routes";
 
@@ -21,6 +22,22 @@ app.use(
 );
 app.use(express.json()); // Parse JSON bodies
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
+
+// Global rate limiter
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per 15 minutes
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    status: 429,
+    message:
+      "Too many requests from this IP, please try again after 15 minutes",
+  },
+});
+
+// Apply rate limiter to all routes
+app.use(globalLimiter);
 
 // Mount routes
 app.use(routes);
