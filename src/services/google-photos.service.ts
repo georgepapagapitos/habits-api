@@ -146,9 +146,13 @@ class GooglePhotosService {
    * Exchange authorization code for tokens
    *
    * @param code The authorization code
+   * @param codeVerifier Optional PKCE code verifier
    * @returns Promise resolving to OAuth tokens
    */
-  async getTokensFromCode(code: string): Promise<GoogleTokens> {
+  async getTokensFromCode(
+    code: string,
+    codeVerifier?: string
+  ): Promise<GoogleTokens> {
     try {
       console.log("Exchanging code for tokens directly in GooglePhotosService");
       console.log("Code length:", code.length);
@@ -173,7 +177,17 @@ class GooglePhotosService {
       );
 
       // Direct token exchange with fresh client
-      const { tokens } = await freshOAuth2Client.getToken(code);
+      console.log(
+        "Token exchange with codeVerifier:",
+        codeVerifier ? "PRESENT" : "MISSING"
+      );
+
+      const { tokens } = codeVerifier
+        ? await freshOAuth2Client.getToken({
+            code,
+            codeVerifier,
+          })
+        : await freshOAuth2Client.getToken(code);
 
       console.log("Received tokens:", {
         access_token: tokens.access_token ? "PRESENT" : "MISSING",
