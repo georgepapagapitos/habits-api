@@ -7,6 +7,9 @@ const router = Router();
 // Apply auth protection to all habit routes
 router.use(protect);
 
+// GET statistics for all habits
+router.get("/stats", habitController.getStats);
+
 // GET all habits
 router.get("/", habitController.getAllHabits);
 

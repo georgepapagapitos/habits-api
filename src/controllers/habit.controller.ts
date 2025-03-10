@@ -25,6 +25,148 @@ function isValidationError(error: unknown): error is ValidationError {
 }
 
 export const habitController = {
+  // Get statistics for user's habits
+  getStats: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      if (!req.user || !req.user.id) {
+        sendErrorResponse(res, 401, "Not authorized");
+        return;
+      }
+
+      // Get all active habits for the user
+      const habits = await Habit.find({
+        active: true,
+        userId: req.user.id,
+      });
+
+      if (!habits || habits.length === 0) {
+        res.status(200).json({
+          success: true,
+          data: {
+            totalHabits: 0,
+            longestStreak: { habit: null, streak: 0 },
+            mostConsistent: { habit: null, percentage: 0 },
+            mostCompletedHabit: { habit: null, count: 0 },
+            totalCompletions: 0,
+            averageStreak: 0,
+          },
+        });
+        return;
+      }
+
+      // Define types for our stats
+      type HabitSummary = { name: string; id: string };
+
+      // Find the habit with the longest streak
+      const longestStreak = habits.reduce<{
+        habit: HabitSummary | null;
+        streak: number;
+      }>(
+        (max, habit) => {
+          return habit.streak > max.streak
+            ? {
+                habit: {
+                  name: habit.name,
+                  id: String(habit._id),
+                },
+                streak: habit.streak,
+              }
+            : max;
+        },
+        { habit: null, streak: 0 }
+      );
+
+      // Calculate consistency percentage (completions / expected)
+      const habitsWithConsistency = habits.map((habit) => {
+        const startDate = new Date(habit.startDate);
+        const now = new Date();
+        const daysSinceStart = Math.ceil(
+          (now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
+        );
+
+        // Calculate expected completions based on frequency and days since start
+        const frequencyPerWeek = habit.frequency.length;
+        const expectedCompletions = Math.max(
+          1,
+          Math.ceil((daysSinceStart * frequencyPerWeek) / 7)
+        );
+
+        // Get actual completions
+        const actualCompletions = habit.completedDates.length;
+
+        // Calculate consistency percentage
+        const consistencyPercentage = Math.min(
+          100,
+          Math.round((actualCompletions / expectedCompletions) * 100)
+        );
+
+        return {
+          habit: {
+            name: habit.name,
+            id: String(habit._id),
+          },
+          consistencyPercentage,
+          actualCompletions,
+        };
+      });
+
+      // Find the most consistent habit
+      const mostConsistent = habitsWithConsistency.reduce<{
+        habit: HabitSummary | null;
+        percentage: number;
+      }>(
+        (max, current) => {
+          return current.consistencyPercentage > max.percentage
+            ? {
+                habit: current.habit,
+                percentage: current.consistencyPercentage,
+              }
+            : max;
+        },
+        { habit: null, percentage: 0 }
+      );
+
+      // Find the most completed habit
+      const mostCompletedHabit = habitsWithConsistency.reduce<{
+        habit: HabitSummary | null;
+        count: number;
+      }>(
+        (max, current) => {
+          return current.actualCompletions > max.count
+            ? { habit: current.habit, count: current.actualCompletions }
+            : max;
+        },
+        { habit: null, count: 0 }
+      );
+
+      // Calculate total completions across all habits
+      const totalCompletions = habitsWithConsistency.reduce(
+        (sum, current) => sum + current.actualCompletions,
+        0
+      );
+
+      // Calculate average streak
+      const averageStreak = Math.round(
+        habits.reduce((sum, habit) => sum + habit.streak, 0) / habits.length
+      );
+
+      res.status(200).json({
+        success: true,
+        data: {
+          totalHabits: habits.length,
+          longestStreak,
+          mostConsistent,
+          mostCompletedHabit,
+          totalCompletions,
+          averageStreak,
+        },
+      });
+    } catch (error) {
+      console.error("Error getting habit stats:", error);
+      sendErrorResponse(res, 500, "Error getting habit statistics", error);
+    }
+  },
+
   // Reset a habit by clearing completed dates and streak
   resetHabit: async (
     req: AuthenticatedRequest,
