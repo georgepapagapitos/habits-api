@@ -452,16 +452,52 @@ export const disconnectGooglePhotos = async (
       return;
     }
 
-    // Remove the entire googlePhotos object
-    const updatedUser = await User.findByIdAndUpdate(
+    // First check if the user has googlePhotos data
+    const user = await User.findById(userId);
+
+    console.log("Before disconnect - User Google Photos status:", {
       userId,
-      { $unset: { googlePhotos: "" } },
-      { new: true }
+      hasGooglePhotos: !!user?.googlePhotos,
+      beforeData: user?.googlePhotos
+        ? JSON.stringify(user.googlePhotos)
+        : "none",
+    });
+
+    if (!user?.googlePhotos) {
+      console.log("User has no Google Photos data to disconnect:", userId);
+      res.json({
+        success: true,
+        message: "Google Photos already disconnected",
+      });
+      return;
+    }
+
+    // Try a different approach - Update directly
+    const result = await User.updateOne(
+      { _id: userId },
+      { $unset: { googlePhotos: "" } }
     );
 
-    console.log("Disconnected Google Photos for user:", {
+    console.log("MongoDB update result:", result);
+
+    // Clear token cache if we had a token manager
+    try {
+      if (tokenManager) tokenManager.clearCache(userId);
+    } catch (e) {
+      console.warn("Failed to clear token cache:", e);
+    }
+
+    // Verify by fetching the user again
+    const verifiedUser = await User.findById(userId);
+    const disconnected = !verifiedUser?.googlePhotos;
+
+    console.log("After disconnect - User Google Photos status:", {
       userId,
-      success: !updatedUser?.googlePhotos,
+      hasGooglePhotos: !!verifiedUser?.googlePhotos,
+      afterData: verifiedUser?.googlePhotos
+        ? JSON.stringify(verifiedUser.googlePhotos)
+        : "none",
+      disconnectSuccess: disconnected,
     });
 
     res.json({
