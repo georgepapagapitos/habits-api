@@ -42,6 +42,22 @@ class GooglePhotosService {
       throw new Error("Google Photos API credentials are not configured");
     }
 
+    // Log environment configuration to help with debugging
+    console.log("GooglePhotosService - Environment Configuration");
+    console.log("- NODE_ENV:", process.env.NODE_ENV || "not set");
+    console.log("- GOOGLE_REDIRECT_URI:", GOOGLE_REDIRECT_URI);
+    console.log("- FRONTEND_URL:", process.env.FRONTEND_URL || "not set");
+
+    // IMPORTANT: These must align with Google Cloud Console
+    console.log(
+      "- Expected frontend callback URL: (Frontend URL)/photos/callback"
+    );
+    console.log(
+      "- Expected Google redirect: (same as GOOGLE_REDIRECT_URI)",
+      GOOGLE_REDIRECT_URI
+    );
+
+    // Create OAuth client with proper credentials
     this.oauth2Client = new google.auth.OAuth2(
       GOOGLE_CLIENT_ID,
       GOOGLE_CLIENT_SECRET,
@@ -99,7 +115,7 @@ class GooglePhotosService {
   }
 
   /**
-   * Generate a simple auth URL without PKCE (legacy support)
+   * Generate an auth URL to authenticate with Google
    *
    * @param state Optional state parameter for security
    * @returns The authorization URL
@@ -107,10 +123,14 @@ class GooglePhotosService {
   getAuthUrl(state?: string): string {
     const scopes = ["https://www.googleapis.com/auth/photoslibrary.readonly"];
 
+    // The key to getting refresh tokens is using both:
+    // 1. access_type=offline
+    // 2. prompt=consent
+    // This forces the consent screen to appear and guarantees a refresh token
     return this.oauth2Client.generateAuthUrl({
       access_type: "offline",
       scope: scopes,
-      prompt: "consent", // Always show consent screen to get refresh token
+      prompt: "consent", // Critical - forces consent screen to get refresh token
       state: state,
       include_granted_scopes: true,
     });
@@ -120,14 +140,54 @@ class GooglePhotosService {
    * Exchange authorization code for tokens
    *
    * @param code The authorization code
-   * @param codeVerifier PKCE code verifier (if using PKCE)
    * @returns Promise resolving to OAuth tokens
    */
-  async getTokensFromCode(
-    code: string,
-    codeVerifier?: string
-  ): Promise<GoogleTokens> {
-    return tokenManager.exchangeGoogleCode(code, codeVerifier);
+  async getTokensFromCode(code: string): Promise<GoogleTokens> {
+    try {
+      console.log("Exchanging code for tokens directly in GooglePhotosService");
+      console.log("Code length:", code.length);
+
+      // Log first and last few characters of code for debugging
+      const maskedCode =
+        code.substring(0, 5) + "..." + code.substring(code.length - 5);
+      console.log("Code preview:", maskedCode);
+
+      console.log("OAuth2Client config:", {
+        clientId: GOOGLE_CLIENT_ID ? "PRESENT" : "MISSING",
+        clientSecret: GOOGLE_CLIENT_SECRET ? "PRESENT" : "MISSING",
+        redirectUri: GOOGLE_REDIRECT_URI,
+      });
+
+      // Direct token exchange
+      const { tokens } = await this.oauth2Client.getToken(code);
+
+      console.log("Received tokens:", {
+        access_token: tokens.access_token ? "PRESENT" : "MISSING",
+        refresh_token: tokens.refresh_token ? "PRESENT" : "MISSING",
+        scope: tokens.scope,
+        token_type: tokens.token_type,
+        expiry_date: tokens.expiry_date,
+      });
+
+      if (!tokens.refresh_token) {
+        console.warn(
+          "WARNING: No refresh token received from Google. This will cause authentication problems later."
+        );
+        // Possible causes:
+        // 1. The user has already granted access to this application
+        // 2. prompt=consent was not included in the authorization URL
+        // 3. access_type=offline was not included in the authorization URL
+        // 4. The user is using the same Google account across multiple auth attempts
+        console.log(
+          "Possible solution: User may need to revoke access to the app in their Google account and try again."
+        );
+      }
+
+      return tokens as GoogleTokens;
+    } catch (error) {
+      console.error("Error exchanging code for tokens:", error);
+      throw error;
+    }
   }
 
   /**
