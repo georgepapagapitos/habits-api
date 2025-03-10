@@ -60,11 +60,25 @@ export const handleAuthCallback = async (
     const tokens = await googlePhotosService.getTokensFromCode(code);
 
     // Save tokens to user
-    await User.findByIdAndUpdate(
+    console.log("Saving tokens to user:", userId);
+    console.log("Tokens to save:", {
+      access_token: tokens.access_token ? "PRESENT" : "MISSING",
+      refresh_token: tokens.refresh_token ? "PRESENT" : "MISSING",
+      expiry_date: tokens.expiry_date,
+    });
+
+    const updatedUser = await User.findByIdAndUpdate(
       userId,
       { $set: { "googlePhotos.tokens": tokens } },
       { new: true }
     );
+
+    console.log("Updated user GooglePhotos data:", {
+      connected: !!updatedUser?.googlePhotos,
+      hasTokens: !!updatedUser?.googlePhotos?.tokens,
+      hasRefreshToken: !!updatedUser?.googlePhotos?.tokens?.refresh_token,
+      selectedAlbumId: updatedUser?.googlePhotos?.selectedAlbumId || "none",
+    });
 
     res.json({
       success: true,
@@ -151,6 +165,14 @@ export const listAlbums = async (
 
     // Get user with tokens
     const user = await User.findById(userId);
+
+    console.log("User GooglePhotos status:", {
+      userId,
+      connected: !!user?.googlePhotos,
+      hasTokens: !!user?.googlePhotos?.tokens,
+      hasRefreshToken: !!user?.googlePhotos?.tokens?.refresh_token,
+      selectedAlbumId: user?.googlePhotos?.selectedAlbumId || "none",
+    });
 
     if (!user?.googlePhotos?.tokens) {
       res.status(400).json({

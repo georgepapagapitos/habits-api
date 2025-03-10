@@ -38,6 +38,9 @@ class GooglePhotosService {
       scope: scopes,
       prompt: "consent",
       state: state, // Include state if provided
+      include_granted_scopes: true,
+      // Force approval prompt to always request refresh token
+      approval_prompt: "force",
     });
   }
 
@@ -59,7 +62,29 @@ class GooglePhotosService {
         code.substring(0, 5) + "..." + code.substring(code.length - 5);
       console.log("Code preview:", maskedCode);
 
+      // We can't access private properties directly, but we can log if the client is properly configured
+      console.log("OAuth2Client config:", {
+        clientId: GOOGLE_CLIENT_ID ? "PRESENT" : "MISSING",
+        clientSecret: GOOGLE_CLIENT_SECRET ? "PRESENT" : "MISSING",
+        redirectUri: GOOGLE_REDIRECT_URI,
+      });
+
       const { tokens } = await this.oauth2Client.getToken(code);
+
+      console.log("Received tokens:", {
+        access_token: tokens.access_token ? "PRESENT" : "MISSING",
+        refresh_token: tokens.refresh_token ? "PRESENT" : "MISSING",
+        scope: tokens.scope,
+        token_type: tokens.token_type,
+        expiry_date: tokens.expiry_date,
+      });
+
+      if (!tokens.refresh_token) {
+        console.warn(
+          "WARNING: No refresh token received from Google. This will cause authentication problems later."
+        );
+      }
+
       return tokens as GoogleTokens;
     } catch (error) {
       console.error("Detailed token exchange error:", error);
@@ -72,6 +97,18 @@ class GooglePhotosService {
    * @param {GoogleTokens} tokens The tokens to set
    */
   setCredentials(tokens: GoogleTokens): void {
+    console.log("Setting credentials:", {
+      has_access_token: !!tokens.access_token,
+      has_refresh_token: !!tokens.refresh_token,
+      expiry_date: tokens.expiry_date,
+    });
+
+    if (!tokens.refresh_token) {
+      console.warn(
+        "WARNING: Setting credentials without refresh token. This will cause authentication issues."
+      );
+    }
+
     this.oauth2Client.setCredentials(tokens);
   }
 
@@ -169,6 +206,24 @@ class GooglePhotosService {
    */
   private async getAccessToken(): Promise<string> {
     try {
+      // Check if we have a refresh token first
+      const credentials = this.oauth2Client.credentials;
+      console.log("Current credentials state:", {
+        has_access_token: !!credentials.access_token,
+        has_refresh_token: !!credentials.refresh_token,
+        expiry_date: credentials.expiry_date,
+        is_expired: credentials.expiry_date
+          ? Date.now() >= credentials.expiry_date
+          : "unknown",
+      });
+
+      if (!credentials.refresh_token) {
+        console.error("No refresh token available - user must re-authenticate");
+        throw new Error(
+          "No refresh token available. Please reconnect your Google Photos account."
+        );
+      }
+
       // If we don't have credentials or they're expired, this will throw an error
       const accessToken = await this.oauth2Client.getAccessToken();
 
