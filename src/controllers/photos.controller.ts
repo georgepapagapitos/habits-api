@@ -5,8 +5,14 @@ import tokenManager from "../services/token-manager.service";
 import { AuthenticatedRequest } from "../middleware/auth.middleware";
 import crypto from "crypto";
 
-// Frontend redirect URL (this should be configurable in environment variables in production)
+// Frontend redirect URL (configurable via environment variable)
+// Production example: https://habits.rubygal.com
+// Development example: http://localhost:3000
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
+
+// Important: The frontend OAuth callback must be configured in Google Cloud Console exactly as:
+// "{FRONTEND_URL}/photos/callback" e.g., "https://habits.rubygal.com/photos/callback"
+// And this MUST match the frontend route in AppRoutes.tsx that renders GoogleCallbackHandler
 
 // Redis/Session client for storing PKCE verifiers (defined in app.ts)
 // For simplicity, we're using a Map for in-memory storage in this example
@@ -117,20 +123,10 @@ export const handleAuthCallback = async (
       return;
     }
 
-    // Get code verifier if state is provided (PKCE flow)
-    let codeVerifier: string | undefined;
-    if (state) {
-      codeVerifier = getAndDeleteCodeVerifier(state);
-      if (!codeVerifier) {
-        console.warn(`No code verifier found for state: ${state}`);
-      }
-    }
-
-    // Exchange code for tokens using PKCE if available
-    const tokens = await googlePhotosService.getTokensFromCode(
-      code,
-      codeVerifier
-    );
+    // We're not using PKCE anymore, just exchange the code for tokens
+    // This simpler approach is more reliable for getting refresh tokens
+    console.log("Processing auth callback for code, exchanging for tokens");
+    const tokens = await googlePhotosService.getTokensFromCode(code);
 
     if (!tokens.refresh_token) {
       console.warn(

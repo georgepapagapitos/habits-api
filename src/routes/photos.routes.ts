@@ -135,6 +135,50 @@ router.get(
   photosController.disconnectGooglePhotos
 );
 
-// Debug route removed for production security
+/**
+ * @route   GET /api/photos/oauth-debug
+ * @desc    Debug route to check OAuth configuration (keep for troubleshooting)
+ * @access  Private
+ */
+router.get("/oauth-debug", protect, (req, res) => {
+  const clientId = process.env.GOOGLE_CLIENT_ID || "not set";
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET || "not set";
+  const redirectUri = process.env.GOOGLE_REDIRECT_URI || "not set";
+  const frontendUrl = process.env.FRONTEND_URL || "not set";
+  const nodeEnv = process.env.NODE_ENV || "not set";
+
+  // Don't expose full credentials, just for diagnostic purposes
+  const maskedClientId =
+    clientId.length > 8
+      ? `${clientId.substring(0, 4)}...${clientId.substring(clientId.length - 4)}`
+      : "(invalid)";
+  const maskedClientSecret =
+    clientSecret.length > 8
+      ? `${clientSecret.substring(0, 2)}...${clientSecret.substring(
+          clientSecret.length - 2
+        )}`
+      : "(invalid)";
+
+  // Critical to check - must match Google Cloud Console exactly
+  const expectedFrontendCallback = `${frontendUrl}/photos/callback`;
+
+  res.json({
+    environment: nodeEnv,
+    oauth: {
+      clientId: maskedClientId,
+      clientIdValid: clientId !== "not set" && clientId.length > 20,
+      clientSecretValid: clientSecret !== "not set" && clientSecret.length > 10,
+      redirectUri,
+      frontendUrl,
+      expectedFrontendCallback,
+    },
+    important_notes: [
+      "GOOGLE_REDIRECT_URI must match exactly what's in Google Cloud Console",
+      "Frontend callback URL must ALSO be added to authorized redirects in Google Console",
+      "Both frontend and backend callback URLs must use the same protocol (http or https)",
+      "For refresh tokens, your OAuth config MUST use access_type=offline AND prompt=consent",
+    ],
+  });
+});
 
 export default router;
