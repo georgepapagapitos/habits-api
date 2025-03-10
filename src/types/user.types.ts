@@ -1,10 +1,24 @@
 import { Document } from "mongoose";
 
+export interface GoogleTokens {
+  access_token: string;
+  refresh_token: string;
+  scope: string;
+  token_type: string;
+  expiry_date: number;
+}
+
+export interface GooglePhotos {
+  tokens?: GoogleTokens;
+  selectedAlbumId?: string;
+}
+
 export interface User {
   username: string;
   email: string;
   password: string;
   createdAt?: Date;
+  googlePhotos?: GooglePhotos;
 }
 
 export interface UserDocument extends User, Document {
