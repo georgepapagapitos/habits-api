@@ -1,4 +1,5 @@
 import { google, Auth } from "googleapis";
+import { CodeChallengeMethod } from "google-auth-library";
 import axios from "axios";
 import {
   GOOGLE_CLIENT_ID,
@@ -90,7 +91,7 @@ class GooglePhotosService {
       prompt: "consent", // Always show consent screen to get refresh token
       state: state,
       code_challenge: codeChallenge,
-      code_challenge_method: "S256", // SHA-256
+      code_challenge_method: "S256" as unknown as CodeChallengeMethod, // Type assertion for GoogleAuth
       include_granted_scopes: true,
     });
 

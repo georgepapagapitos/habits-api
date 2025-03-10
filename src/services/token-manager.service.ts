@@ -149,14 +149,12 @@ class TokenManagerService {
     try {
       console.log("Exchanging code for tokens");
 
-      // If using PKCE, set code verifier
-      if (codeVerifier) {
-        this.oauth2Client.setCredentials({
-          code_verifier: codeVerifier,
-        });
-      }
-
-      const { tokens } = await this.oauth2Client.getToken(code);
+      // For PKCE, we need to pass the code_verifier directly to getToken
+      // instead of setting it in credentials
+      const { tokens } = await this.oauth2Client.getToken({
+        code,
+        ...(codeVerifier ? { codeVerifier } : {}),
+      });
 
       console.log("Received tokens:", {
         access_token: tokens.access_token ? "PRESENT" : "MISSING",
