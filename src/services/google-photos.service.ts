@@ -1,4 +1,5 @@
 import { google, Auth } from "googleapis";
+import { CodeChallengeMethod } from "google-auth-library";
 import axios from "axios";
 import {
   GOOGLE_CLIENT_ID,
@@ -6,13 +7,36 @@ import {
   GOOGLE_REDIRECT_URI,
 } from "../config/env";
 import { GoogleTokens } from "../types/user.types";
+import crypto from "crypto";
+import tokenManager from "./token-manager.service";
 
-// Constants for Google Photos API
+/**
+ * Constants for Google Photos API
+ */
 const PHOTOS_API_BASE_URL = "https://photoslibrary.googleapis.com/v1";
 
+/**
+ * Google Photos Service
+ *
+ * This service handles interactions with the Google Photos API:
+ * - Authentication with OAuth 2.0 and PKCE
+ * - Album listing and photo retrieval
+ * - Token management through the TokenManager service
+ *
+ * @example
+ * // Get authentication URL for user
+ * const authUrl = googlePhotosService.getAuthUrl();
+ *
+ * // List user's albums
+ * const albums = await googlePhotosService.listAlbums(userId);
+ */
 class GooglePhotosService {
   private oauth2Client: Auth.OAuth2Client;
 
+  /**
+   * Create a new GooglePhotosService
+   * Validates required environment variables
+   */
   constructor() {
     if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET || !GOOGLE_REDIRECT_URI) {
       throw new Error("Google Photos API credentials are not configured");
@@ -26,9 +50,59 @@ class GooglePhotosService {
   }
 
   /**
+   * Generate a secure random string for PKCE
+   * @returns Random string suitable for code_verifier
+   */
+  private generateCodeVerifier(): string {
+    return crypto.randomBytes(32).toString("base64url");
+  }
+
+  /**
+   * Generate a code challenge from a verifier for PKCE
+   * @param verifier Code verifier
+   * @returns Code challenge
+   */
+  private generateCodeChallenge(verifier: string): string {
+    return crypto
+      .createHash("sha256")
+      .update(verifier)
+      .digest()
+      .toString("base64url");
+  }
+
+  /**
    * Generate a URL for the user to authenticate with Google
-   * @param {string} state Optional state parameter for security
-   * @returns {string} The authorization URL
+   * Implements PKCE for enhanced security
+   *
+   * @param state Optional state parameter for CSRF protection
+   * @returns Object with auth URL and code verifier to store
+   */
+  getAuthUrlWithPKCE(state?: string): {
+    authUrl: string;
+    codeVerifier: string;
+  } {
+    const scopes = ["https://www.googleapis.com/auth/photoslibrary.readonly"];
+    const codeVerifier = this.generateCodeVerifier();
+    const codeChallenge = this.generateCodeChallenge(codeVerifier);
+
+    const authUrl = this.oauth2Client.generateAuthUrl({
+      access_type: "offline",
+      scope: scopes,
+      prompt: "consent", // Always show consent screen to get refresh token
+      state: state,
+      code_challenge: codeChallenge,
+      code_challenge_method: "S256" as unknown as CodeChallengeMethod, // Type assertion for GoogleAuth
+      include_granted_scopes: true,
+    });
+
+    return { authUrl, codeVerifier };
+  }
+
+  /**
+   * Generate a simple auth URL without PKCE (legacy support)
+   *
+   * @param state Optional state parameter for security
+   * @returns The authorization URL
    */
   getAuthUrl(state?: string): string {
     const scopes = ["https://www.googleapis.com/auth/photoslibrary.readonly"];
@@ -36,86 +110,34 @@ class GooglePhotosService {
     return this.oauth2Client.generateAuthUrl({
       access_type: "offline",
       scope: scopes,
-      // Use prompt: "consent" to always show the consent screen (gets refresh token)
-      prompt: "consent",
-      state: state, // Include state if provided
+      prompt: "consent", // Always show consent screen to get refresh token
+      state: state,
       include_granted_scopes: true,
     });
   }
 
   /**
    * Exchange authorization code for tokens
-   * @param {string} code The authorization code
-   * @returns {Promise<GoogleTokens>} Token response
+   *
+   * @param code The authorization code
+   * @param codeVerifier PKCE code verifier (if using PKCE)
+   * @returns Promise resolving to OAuth tokens
    */
-  async getTokensFromCode(code: string): Promise<GoogleTokens> {
-    try {
-      console.log(
-        "Exchanging code for tokens. Redirect URI:",
-        GOOGLE_REDIRECT_URI
-      );
-      console.log("Code length:", code.length);
-
-      // Log first and last few characters of code for debugging
-      const maskedCode =
-        code.substring(0, 5) + "..." + code.substring(code.length - 5);
-      console.log("Code preview:", maskedCode);
-
-      // We can't access private properties directly, but we can log if the client is properly configured
-      console.log("OAuth2Client config:", {
-        clientId: GOOGLE_CLIENT_ID ? "PRESENT" : "MISSING",
-        clientSecret: GOOGLE_CLIENT_SECRET ? "PRESENT" : "MISSING",
-        redirectUri: GOOGLE_REDIRECT_URI,
-      });
-
-      const { tokens } = await this.oauth2Client.getToken(code);
-
-      console.log("Received tokens:", {
-        access_token: tokens.access_token ? "PRESENT" : "MISSING",
-        refresh_token: tokens.refresh_token ? "PRESENT" : "MISSING",
-        scope: tokens.scope,
-        token_type: tokens.token_type,
-        expiry_date: tokens.expiry_date,
-      });
-
-      if (!tokens.refresh_token) {
-        console.warn(
-          "WARNING: No refresh token received from Google. This will cause authentication problems later."
-        );
-      }
-
-      return tokens as GoogleTokens;
-    } catch (error) {
-      console.error("Detailed token exchange error:", error);
-      throw error;
-    }
+  async getTokensFromCode(
+    code: string,
+    codeVerifier?: string
+  ): Promise<GoogleTokens> {
+    return tokenManager.exchangeGoogleCode(code, codeVerifier);
   }
 
   /**
-   * Set the credentials for the OAuth2 client
-   * @param {GoogleTokens} tokens The tokens to set
+   * List albums for a user
+   * Uses tokenManager to handle authentication and token refresh
+   *
+   * @param userId The user ID to get albums for
+   * @returns List of albums
    */
-  setCredentials(tokens: GoogleTokens): void {
-    console.log("Setting credentials:", {
-      has_access_token: !!tokens.access_token,
-      has_refresh_token: !!tokens.refresh_token,
-      expiry_date: tokens.expiry_date,
-    });
-
-    if (!tokens.refresh_token) {
-      console.warn(
-        "WARNING: Setting credentials without refresh token. This will cause authentication issues."
-      );
-    }
-
-    this.oauth2Client.setCredentials(tokens);
-  }
-
-  /**
-   * List albums for the authenticated user
-   * @returns {Promise<{albums?: Array<{id: string, title: string, productUrl: string, coverPhotoBaseUrl?: string}>}>} List of albums
-   */
-  async listAlbums(): Promise<{
+  async listAlbums(userId: string): Promise<{
     albums?: Array<{
       id: string;
       title: string;
@@ -125,8 +147,8 @@ class GooglePhotosService {
     }>;
   }> {
     try {
-      // Get a fresh access token if needed
-      const accessToken = await this.getAccessToken();
+      // Get a fresh access token from the token manager
+      const accessToken = await tokenManager.getGoogleAccessToken(userId);
 
       console.log("Making request to Google Photos API to list albums");
       const response = await axios.get(`${PHOTOS_API_BASE_URL}/albums`, {
@@ -149,10 +171,15 @@ class GooglePhotosService {
 
   /**
    * Get photos from a specific album
-   * @param {string} albumId The ID of the album
-   * @returns {Promise<{mediaItems?: Array<{id: string, baseUrl: string, productUrl: string, mimeType: string, filename: string, mediaMetadata?: object}>}>} List of media items in the album
+   *
+   * @param userId The user ID to get photos for
+   * @param albumId The ID of the album
+   * @returns List of media items in the album
    */
-  async getAlbumPhotos(albumId: string): Promise<{
+  async getAlbumPhotos(
+    userId: string,
+    albumId: string
+  ): Promise<{
     mediaItems?: Array<{
       id: string;
       baseUrl: string;
@@ -168,8 +195,8 @@ class GooglePhotosService {
     nextPageToken?: string;
   }> {
     try {
-      // Get a fresh access token if needed
-      const accessToken = await this.getAccessToken();
+      // Get a fresh access token from the token manager
+      const accessToken = await tokenManager.getGoogleAccessToken(userId);
 
       console.log(
         `Making request to Google Photos API to get photos from album: ${albumId}`
@@ -196,47 +223,6 @@ class GooglePhotosService {
         console.error("Response data:", error.response.data);
       }
       throw error;
-    }
-  }
-
-  /**
-   * Helper method to get a current access token
-   * @returns {Promise<string>} The access token
-   */
-  private async getAccessToken(): Promise<string> {
-    try {
-      // Check if we have a refresh token first
-      const credentials = this.oauth2Client.credentials;
-      console.log("Current credentials state:", {
-        has_access_token: !!credentials.access_token,
-        has_refresh_token: !!credentials.refresh_token,
-        expiry_date: credentials.expiry_date,
-        is_expired: credentials.expiry_date
-          ? Date.now() >= credentials.expiry_date
-          : "unknown",
-      });
-
-      if (!credentials.refresh_token) {
-        console.error("No refresh token available - user must re-authenticate");
-        throw new Error(
-          "No refresh token available. Please reconnect your Google Photos account."
-        );
-      }
-
-      // If we don't have credentials or they're expired, this will throw an error
-      const accessToken = await this.oauth2Client.getAccessToken();
-
-      // Check if we got a token
-      if (!accessToken.token) {
-        throw new Error("No access token available");
-      }
-
-      return accessToken.token;
-    } catch (error) {
-      console.error("Error getting access token:", error);
-      throw new Error(
-        "Failed to get access token, re-authentication may be required"
-      );
     }
   }
 }

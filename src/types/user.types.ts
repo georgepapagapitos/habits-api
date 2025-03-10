@@ -8,9 +8,13 @@ export interface GoogleTokens {
   expiry_date: number;
 }
 
+export type ConnectionStatus = "connected" | "needs_reconnect" | "disconnected";
+
 export interface GooglePhotos {
   tokens?: GoogleTokens;
   selectedAlbumId?: string;
+  connectionStatus?: ConnectionStatus;
+  lastConnected?: Date;
 }
 
 export interface User {

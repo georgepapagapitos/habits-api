@@ -124,36 +124,17 @@ router.post(
 );
 
 /**
- * @route   GET /api/photos/debug
- * @desc    Debug route to check OAuth configuration (REMOVE IN PRODUCTION)
+ * @route   GET /api/photos/disconnect
+ * @desc    Alternative endpoint to disconnect Google Photos (for debugging)
  * @access  Private
  */
-router.get("/debug", protect, authCallbackLimiter, (req, res) => {
-  // Don't expose full secret, just first/last characters
-  const clientId = process.env.GOOGLE_CLIENT_ID || "not set";
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET || "not set";
-  const redirectUri = process.env.GOOGLE_REDIRECT_URI || "not set";
+router.get(
+  "/disconnect",
+  protect,
+  authCallbackLimiter,
+  photosController.disconnectGooglePhotos
+);
 
-  const maskedClientId =
-    clientId.length > 8
-      ? `${clientId.substring(0, 4)}...${clientId.substring(clientId.length - 4)}`
-      : "(invalid)";
-
-  const maskedClientSecret =
-    clientSecret.length > 8
-      ? `${clientSecret.substring(0, 2)}...${clientSecret.substring(clientSecret.length - 2)}`
-      : "(invalid)";
-
-  res.json({
-    config: {
-      clientId: maskedClientId,
-      clientSecret: maskedClientSecret,
-      redirectUri,
-      clientIdLength: clientId.length,
-      clientSecretLength: clientSecret.length,
-    },
-    photosApiEnabled: !!process.env.GOOGLE_CLIENT_ID,
-  });
-});
+// Debug route removed for production security
 
 export default router;
