@@ -118,7 +118,7 @@ function calculateStreak(
     // If more than one day since last completion, check if due dates were missed
     else if (daysSinceLastCompletion > 1) {
       let missedDueDate = false;
-      let checkDate = new Date(yesterday);
+      const checkDate = new Date(yesterday);
       const lastCompletionDate = new Date(mostRecentCompletion);
 
       // Check each day between yesterday and last completion
@@ -151,7 +151,7 @@ function calculateStreak(
   // Count consecutive completed dates going backward
   if (streak > 0 || isCompletedToday) {
     // Adjust starting point for backward count
-    let checkDate = isCompletedToday
+    const checkDate = isCompletedToday
       ? new Date(yesterday)
       : new Date(mostRecentCompletion);
 

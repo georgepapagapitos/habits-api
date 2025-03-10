@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import { User } from "../src/models/user.model";
 import { Habit } from "../src/models/habit.model";
 import dotenv from "dotenv";
-import { addDays, format, subDays } from "date-fns";
+import { subDays } from "date-fns";
 
 // Load environment variables
 dotenv.config();

@@ -1,11 +1,24 @@
 import { Router } from "express";
 import { habitController } from "../controllers/habit.controller";
 import { protect } from "../middleware/auth.middleware";
+import rateLimit from "express-rate-limit";
 
 const router = Router();
 
+// Set up rate limiter: maximum of 100 requests per 15 minutes
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // max 100 requests per windowMs
+});
+
 // Apply auth protection to all habit routes
 router.use(protect);
+
+// Apply rate limiter to routes that perform expensive operations
+router.use(limiter);
+
+// GET statistics for all habits
+router.get("/stats", habitController.getStats);
 
 // GET all habits
 router.get("/", habitController.getAllHabits);
