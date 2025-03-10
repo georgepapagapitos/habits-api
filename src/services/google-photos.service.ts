@@ -36,11 +36,10 @@ class GooglePhotosService {
     return this.oauth2Client.generateAuthUrl({
       access_type: "offline",
       scope: scopes,
+      // Use prompt: "consent" to always show the consent screen (gets refresh token)
       prompt: "consent",
       state: state, // Include state if provided
       include_granted_scopes: true,
-      // Force approval prompt to always request refresh token
-      approval_prompt: "force",
     });
   }
 
