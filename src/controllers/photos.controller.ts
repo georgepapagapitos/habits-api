@@ -293,21 +293,16 @@ export const disconnectGooglePhotos = async (
       return;
     }
 
-    // Clear Google Photos tokens
+    // Remove the entire googlePhotos object
     const updatedUser = await User.findByIdAndUpdate(
       userId,
-      {
-        $unset: {
-          "googlePhotos.tokens": "",
-          "googlePhotos.selectedAlbumId": "",
-        },
-      },
+      { $unset: { googlePhotos: "" } },
       { new: true }
     );
 
     console.log("Disconnected Google Photos for user:", {
       userId,
-      success: !updatedUser?.googlePhotos?.tokens,
+      success: !updatedUser?.googlePhotos,
     });
 
     res.json({
