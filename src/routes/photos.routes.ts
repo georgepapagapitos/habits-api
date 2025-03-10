@@ -112,6 +112,18 @@ router.get(
 );
 
 /**
+ * @route   POST /api/photos/disconnect
+ * @desc    Disconnect Google Photos by clearing saved tokens
+ * @access  Private
+ */
+router.post(
+  "/disconnect",
+  protect,
+  authCallbackLimiter,
+  photosController.disconnectGooglePhotos
+);
+
+/**
  * @route   GET /api/photos/debug
  * @desc    Debug route to check OAuth configuration (REMOVE IN PRODUCTION)
  * @access  Private

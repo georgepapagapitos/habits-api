@@ -7,6 +7,9 @@ import routes from "./routes";
 
 const app: Express = express();
 
+// Trust proxy - important for rate limiting to work correctly behind a reverse proxy
+app.set("trust proxy", 1);
+
 // Middleware
 app.use(helmet()); // Security headers
 // Configure CORS to allow requests from any origin in development
