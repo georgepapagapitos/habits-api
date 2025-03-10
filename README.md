@@ -7,6 +7,7 @@ A RESTful API for the Habits application built with Node.js, Express, TypeScript
 - 🔐 JWT-based authentication
 - 🔍 CRUD operations for habits
 - 📊 Track habit completion data
+- 🖼️ Google Photos integration for rewards
 - 🛡️ Input validation and error handling
 - 📝 Type safety with TypeScript
 - 🧪 Comprehensive test suite
@@ -20,6 +21,7 @@ A RESTful API for the Habits application built with Node.js, Express, TypeScript
 - **Framework**: Express.js
 - **Database**: MongoDB with Mongoose ODM
 - **Authentication**: JWT (JSON Web Tokens)
+- **External APIs**: Google Photos API
 - **Validation**: express-validator
 - **Security**: helmet, cors, rate limiting
 - **Environment**: dotenv for configuration
@@ -41,6 +43,15 @@ A RESTful API for the Habits application built with Node.js, Express, TypeScript
 - `DELETE /api/habits/:id` - Delete a habit
 - `PATCH /api/habits/:id/toggle` - Toggle a habit's completion status for today
 - `PATCH /api/habits/:id/toggle/:date` - Toggle a habit's completion status for a specific date
+
+### Google Photos Integration
+
+- `GET /api/photos/auth-url` - Get Google authorization URL
+- `POST /api/photos/auth-callback` - Exchange authorization code for tokens
+- `GET /api/photos/albums` - Get list of user's albums
+- `GET /api/photos/albums/:albumId/photos` - Get photos from a specific album
+- `POST /api/photos/select-album` - Select an album to use for rewards
+- `GET /api/photos/reward` - Get a random photo from the selected album as a reward
 
 ## Getting Started
 
@@ -74,6 +85,11 @@ A RESTful API for the Habits application built with Node.js, Express, TypeScript
    MONGODB_URI=mongodb://localhost:27017/habits
    JWT_SECRET=your_jwt_secret_key
    NODE_ENV=development
+
+   # Google Photos API (Optional - Only needed for photo rewards feature)
+   GOOGLE_CLIENT_ID=your_google_client_id
+   GOOGLE_CLIENT_SECRET=your_google_client_secret
+   GOOGLE_REDIRECT_URI=http://localhost:5050/api/photos/auth-callback
    ```
 
 4. Start the development server
@@ -169,7 +185,8 @@ habits-api/
 │   │   └── env.ts     # Environment variables
 │   ├── controllers/   # Request handlers
 │   │   ├── auth.controller.ts
-│   │   └── habit.controller.ts
+│   │   ├── habit.controller.ts
+│   │   └── photos.controller.ts        # Google Photos controller
 │   ├── middleware/    # Custom middleware
 │   │   ├── auth.middleware.ts
 │   │   └── error.middleware.ts
@@ -179,7 +196,10 @@ habits-api/
 │   ├── routes/        # API routes
 │   │   ├── auth.routes.ts
 │   │   ├── habit.routes.ts
+│   │   ├── photos.routes.ts            # Google Photos routes
 │   │   └── index.ts
+│   ├── services/      # External services
+│   │   └── google-photos.service.ts    # Google Photos API service
 │   ├── types/         # TypeScript interfaces
 │   │   ├── habit.types.ts
 │   │   └── user.types.ts
@@ -248,12 +268,15 @@ Authorization: Bearer <your_jwt_token>
 
 ## Environment Variables
 
-| Variable    | Description                     | Default Value              |
-| ----------- | ------------------------------- | -------------------------- |
-| PORT        | Port to run the server          | 5050                       |
-| MONGODB_URI | MongoDB connection string       | mongodb://localhost/habits |
-| JWT_SECRET  | Secret for JWT token generation | (required)                 |
-| NODE_ENV    | Environment (dev/prod)          | development                |
+| Variable             | Description                     | Default Value                                  |
+| -------------------- | ------------------------------- | ---------------------------------------------- |
+| PORT                 | Port to run the server          | 5050                                           |
+| MONGODB_URI          | MongoDB connection string       | mongodb://localhost/habits                     |
+| JWT_SECRET           | Secret for JWT token generation | (required)                                     |
+| NODE_ENV             | Environment (dev/prod)          | development                                    |
+| GOOGLE_CLIENT_ID     | Google OAuth client ID          | (required for Google Photos integration)       |
+| GOOGLE_CLIENT_SECRET | Google OAuth client secret      | (required for Google Photos integration)       |
+| GOOGLE_REDIRECT_URI  | OAuth redirect URI              | http://localhost:5050/api/photos/auth-callback |
 
 ## Contributing
 
