@@ -13,6 +13,7 @@ export interface HabitBase {
   active: boolean;
   userId: string;
   userTimezone?: string; // Store user's timezone for correct date calculations
+  showReward?: boolean; // Whether to show a reward photo when completing the habit
 }
 
 export interface HabitDocument extends HabitBase, Document {

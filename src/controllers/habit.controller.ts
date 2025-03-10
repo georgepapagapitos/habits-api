@@ -394,10 +394,10 @@ export const habitController = {
         return;
       }
 
-      const { date, timezone } = req.body;
+      const { date, timezone, seed } = req.body;
 
       console.log(
-        `Toggle request received: id=${req.params.id}, date=${date || "undefined"}, timezone=${timezone}`
+        `Toggle request received: id=${req.params.id}, date=${date || "undefined"}, timezone=${timezone}, seed=${seed || "undefined"}`
       );
 
       if (!date) {
@@ -475,9 +475,47 @@ export const habitController = {
           `Updated completed dates: ${savedHabit.completedDates.map((d) => new Date(d).toISOString()).join(", ")}`
         );
 
+        // Get a reward photo when habit is completed (only for habits with showReward=true)
+        let rewardPhoto = null;
+
+        if (!isCompleted && habit.showReward === true) {
+          console.log(
+            "Getting reward photo for completed habit with showReward=true"
+          );
+          try {
+            // Import the service to avoid circular dependencies
+            const { getRandomPhoto } = await import(
+              "../services/google-photos.service"
+            );
+
+            // Pass the seed if available for deterministic photo selection
+            rewardPhoto = await getRandomPhoto(seed ? Number(seed) : undefined);
+
+            console.log(
+              "Successfully fetched reward photo:",
+              rewardPhoto ? "Present" : "Null"
+            );
+            if (rewardPhoto) {
+              console.log("Photo details:", JSON.stringify(rewardPhoto));
+            } else {
+              console.log("No photo was returned from Google Photos API");
+            }
+          } catch (photoError) {
+            console.error("Error fetching reward photo:", photoError);
+            // Continue without a photo if there's an error
+          }
+        } else if (!isCompleted) {
+          console.log(
+            `Habit was completed but showReward=${habit.showReward}, not fetching reward photo`
+          );
+        } else {
+          console.log("Habit was unmarked, not fetching reward photo");
+        }
+
         res.status(200).json({
           success: true,
           data: savedHabit,
+          rewardPhoto,
         });
       } catch (saveError) {
         console.error("Error saving habit:", saveError);
