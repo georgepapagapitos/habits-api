@@ -1,6 +1,7 @@
 import { Router } from "express";
 import authRoutes from "./auth.routes";
 import habitRoutes from "./habit.routes";
+import photosRoutes from "./photos.routes";
 
 const router = Router();
 
@@ -12,5 +13,6 @@ router.get("/health", (req, res) => {
 // API routes
 router.use("/api/habits", habitRoutes);
 router.use("/api/auth", authRoutes);
+router.use("/api/photos", photosRoutes);
 
 export default router;
