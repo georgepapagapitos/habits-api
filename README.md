@@ -1,6 +1,6 @@
 # Habits - API
 
-ØA RESTful API for the Habits application built with Node.js, Express, TypeScript, and MongoDB.
+A RESTful API for the Habits application built with Node.js, Express, TypeScript, and MongoDB.
 
 ## Features
 
