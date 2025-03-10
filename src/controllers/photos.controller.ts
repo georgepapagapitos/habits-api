@@ -278,6 +278,49 @@ export const saveSelectedAlbum = async (
 };
 
 /**
+ * Disconnect Google Photos by clearing saved tokens
+ */
+export const disconnectGooglePhotos = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  _next: NextFunction
+): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({ message: "User not authenticated" });
+      return;
+    }
+
+    // Clear Google Photos tokens
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      {
+        $unset: {
+          "googlePhotos.tokens": "",
+          "googlePhotos.selectedAlbumId": "",
+        },
+      },
+      { new: true }
+    );
+
+    console.log("Disconnected Google Photos for user:", {
+      userId,
+      success: !updatedUser?.googlePhotos?.tokens,
+    });
+
+    res.json({
+      success: true,
+      message: "Google Photos disconnected successfully",
+    });
+  } catch (error) {
+    console.error("Error disconnecting Google Photos:", error);
+    res.status(500).json({ message: "Failed to disconnect Google Photos" });
+  }
+};
+
+/**
  * Get a random photo from user's selected album
  */
 export const getRandomRewardPhoto = async (
