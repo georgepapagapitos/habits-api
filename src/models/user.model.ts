@@ -36,6 +36,12 @@ const userSchema = new mongoose.Schema(
         expiry_date: Number,
       },
       selectedAlbumId: String,
+      connectionStatus: {
+        type: String,
+        enum: ["connected", "needs_reconnect", "disconnected"],
+        default: "connected",
+      },
+      lastConnected: Date,
     },
   },
   {

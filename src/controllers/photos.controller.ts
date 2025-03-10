@@ -1,13 +1,64 @@
 import { Request, Response, NextFunction } from "express";
 import { User } from "../models/user.model";
 import googlePhotosService from "../services/google-photos.service";
+import tokenManager from "../services/token-manager.service";
 import { AuthenticatedRequest } from "../middleware/auth.middleware";
+import crypto from "crypto";
 
 // Frontend redirect URL (this should be configurable in environment variables in production)
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
 
+// Redis/Session client for storing PKCE verifiers (defined in app.ts)
+// For simplicity, we're using a Map for in-memory storage in this example
+// In production, use Redis or another session store
+const codeVerifierStore = new Map<
+  string,
+  { verifier: string; expires: number }
+>();
+
+/**
+ * Store a code verifier with TTL
+ * @param state The state parameter to use as key
+ * @param verifier The code verifier to store
+ * @param ttlSeconds Time to live in seconds (default: 10 minutes)
+ */
+function storeCodeVerifier(
+  state: string,
+  verifier: string,
+  ttlSeconds = 600
+): void {
+  codeVerifierStore.set(state, {
+    verifier,
+    expires: Date.now() + ttlSeconds * 1000,
+  });
+}
+
+/**
+ * Get and delete a code verifier
+ * @param state The state parameter used as key
+ * @returns The code verifier or undefined if not found or expired
+ */
+function getAndDeleteCodeVerifier(state: string): string | undefined {
+  const entry = codeVerifierStore.get(state);
+
+  if (!entry) {
+    return undefined;
+  }
+
+  // Clean up expired entries
+  if (entry.expires < Date.now()) {
+    codeVerifierStore.delete(state);
+    return undefined;
+  }
+
+  // Delete after retrieval
+  codeVerifierStore.delete(state);
+  return entry.verifier;
+}
+
 /**
  * Generate Google Photos authorization URL
+ * Implements PKCE for enhanced security
  */
 export const getAuthUrl = (
   req: Request,
@@ -20,11 +71,20 @@ export const getAuthUrl = (
     console.log("- Client Secret exists:", !!process.env.GOOGLE_CLIENT_SECRET);
     console.log("- Redirect URI:", process.env.GOOGLE_REDIRECT_URI);
 
-    const authUrl = googlePhotosService.getAuthUrl();
+    // Generate a random state parameter for CSRF protection
+    const state = crypto.randomBytes(16).toString("hex");
 
-    // Also return the configured redirect URI so user can verify it matches Google Cloud
+    // Get auth URL with PKCE
+    const { authUrl, codeVerifier } =
+      googlePhotosService.getAuthUrlWithPKCE(state);
+
+    // Store the code verifier temporarily
+    storeCodeVerifier(state, codeVerifier);
+
+    // Return auth URL with state parameter
     res.json({
       authUrl,
+      state,
       redirectUri: process.env.GOOGLE_REDIRECT_URI,
       note: "Make sure this redirectUri exactly matches what's configured in Google Cloud Console",
     });
@@ -36,6 +96,7 @@ export const getAuthUrl = (
 
 /**
  * Handle OAuth callback and save tokens to user (from request body)
+ * Supports PKCE for enhanced security
  */
 export const handleAuthCallback = async (
   req: AuthenticatedRequest,
@@ -43,7 +104,7 @@ export const handleAuthCallback = async (
   _next: NextFunction
 ): Promise<void> => {
   try {
-    const { code } = req.body;
+    const { code, state } = req.body;
     const userId = req.user?.id;
 
     if (!code) {
@@ -56,10 +117,28 @@ export const handleAuthCallback = async (
       return;
     }
 
-    // Exchange code for tokens
-    const tokens = await googlePhotosService.getTokensFromCode(code);
+    // Get code verifier if state is provided (PKCE flow)
+    let codeVerifier: string | undefined;
+    if (state) {
+      codeVerifier = getAndDeleteCodeVerifier(state);
+      if (!codeVerifier) {
+        console.warn(`No code verifier found for state: ${state}`);
+      }
+    }
 
-    // Save tokens to user
+    // Exchange code for tokens using PKCE if available
+    const tokens = await googlePhotosService.getTokensFromCode(
+      code,
+      codeVerifier
+    );
+
+    if (!tokens.refresh_token) {
+      console.warn(
+        "No refresh token received. This will cause authentication issues later."
+      );
+    }
+
+    // Save tokens to user with updated timestamp
     console.log("Saving tokens to user:", userId);
     console.log("Tokens to save:", {
       access_token: tokens.access_token ? "PRESENT" : "MISSING",
@@ -69,7 +148,13 @@ export const handleAuthCallback = async (
 
     const updatedUser = await User.findByIdAndUpdate(
       userId,
-      { $set: { "googlePhotos.tokens": tokens } },
+      {
+        $set: {
+          "googlePhotos.tokens": tokens,
+          "googlePhotos.connectionStatus": "connected",
+          "googlePhotos.lastConnected": new Date(),
+        },
+      },
       { new: true }
     );
 
@@ -77,8 +162,13 @@ export const handleAuthCallback = async (
       connected: !!updatedUser?.googlePhotos,
       hasTokens: !!updatedUser?.googlePhotos?.tokens,
       hasRefreshToken: !!updatedUser?.googlePhotos?.tokens?.refresh_token,
+      connectionStatus: updatedUser?.googlePhotos?.connectionStatus,
+      lastConnected: updatedUser?.googlePhotos?.lastConnected,
       selectedAlbumId: updatedUser?.googlePhotos?.selectedAlbumId || "none",
     });
+
+    // Clear any cached tokens
+    tokenManager.clearCache(userId);
 
     res.json({
       success: true,
@@ -95,6 +185,7 @@ export const handleAuthCallback = async (
 /**
  * Handle OAuth callback with query parameters (for direct browser redirects)
  * Redirects back to the frontend with the authorization code or error
+ * Supports PKCE by preserving state parameter
  */
 export const handleAuthCallbackRedirect = async (
   req: Request,
@@ -102,7 +193,7 @@ export const handleAuthCallbackRedirect = async (
   _next: NextFunction
 ): Promise<void> => {
   try {
-    const { code, error: authError, error_description } = req.query;
+    const { code, state, error: authError, error_description } = req.query;
 
     // Check if Google returned an error
     if (authError) {
@@ -128,11 +219,16 @@ export const handleAuthCallbackRedirect = async (
       code.length
     );
 
-    // Redirect to frontend with the code
-    // The frontend will then send this code to the backend with proper authentication
-    res.redirect(
-      `${FRONTEND_URL}/photos/callback?code=${encodeURIComponent(code)}`
-    );
+    // Build redirect URL with code and state (if available)
+    let redirectUrl = `${FRONTEND_URL}/photos/callback?code=${encodeURIComponent(code)}`;
+
+    // Include state parameter if provided (needed for PKCE)
+    if (state && typeof state === "string") {
+      redirectUrl += `&state=${encodeURIComponent(state)}`;
+    }
+
+    // Redirect to frontend with the code (and state if available)
+    res.redirect(redirectUrl);
   } catch (error) {
     console.error("Error processing auth callback redirect:", error);
 
@@ -149,6 +245,7 @@ export const handleAuthCallbackRedirect = async (
 
 /**
  * List user's Google Photos albums
+ * Uses token manager for automatic token refresh
  */
 export const listAlbums = async (
   req: AuthenticatedRequest,
@@ -163,13 +260,14 @@ export const listAlbums = async (
       return;
     }
 
-    // Get user with tokens
+    // Get user to check connection status
     const user = await User.findById(userId);
 
     console.log("User GooglePhotos status:", {
       userId,
       connected: !!user?.googlePhotos,
       hasTokens: !!user?.googlePhotos?.tokens,
+      connectionStatus: user?.googlePhotos?.connectionStatus || "unknown",
       hasRefreshToken: !!user?.googlePhotos?.tokens?.refresh_token,
       selectedAlbumId: user?.googlePhotos?.selectedAlbumId || "none",
     });
@@ -182,11 +280,43 @@ export const listAlbums = async (
       return;
     }
 
-    // Set credentials and get albums
-    googlePhotosService.setCredentials(user.googlePhotos.tokens);
-    const albums = await googlePhotosService.listAlbums();
+    // Check connection status
+    if (user.googlePhotos.connectionStatus === "needs_reconnect") {
+      res.status(401).json({
+        message:
+          "Your Google Photos connection needs to be refreshed. Please reconnect.",
+        needsReconnect: true,
+      });
+      return;
+    }
 
-    res.json(albums);
+    // Get albums using token manager for authentication
+    try {
+      const albums = await googlePhotosService.listAlbums(userId);
+      res.json(albums);
+    } catch (error) {
+      // If the error is related to authentication
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+
+      if (
+        errorMessage.includes("refresh") ||
+        errorMessage.includes("reconnect")
+      ) {
+        // Update user status to needs_reconnect
+        await User.findByIdAndUpdate(userId, {
+          $set: { "googlePhotos.connectionStatus": "needs_reconnect" },
+        });
+
+        res.status(401).json({
+          message:
+            "Your Google Photos connection needs to be refreshed. Please reconnect.",
+          needsReconnect: true,
+        });
+      } else {
+        throw error; // Re-throw for general error handling
+      }
+    }
   } catch (error) {
     console.error("Error listing albums:", error);
     res.status(500).json({ message: "Failed to retrieve albums" });
@@ -195,6 +325,7 @@ export const listAlbums = async (
 
 /**
  * Get photos from a specific album
+ * Uses token manager for automatic token refresh
  */
 export const getAlbumPhotos = async (
   req: AuthenticatedRequest,
@@ -210,7 +341,7 @@ export const getAlbumPhotos = async (
       return;
     }
 
-    // Get user with tokens
+    // Get user to check connection status
     const user = await User.findById(userId);
 
     if (!user?.googlePhotos?.tokens) {
@@ -221,11 +352,43 @@ export const getAlbumPhotos = async (
       return;
     }
 
-    // Set credentials and get photos
-    googlePhotosService.setCredentials(user.googlePhotos.tokens);
-    const photos = await googlePhotosService.getAlbumPhotos(albumId);
+    // Check connection status
+    if (user.googlePhotos.connectionStatus === "needs_reconnect") {
+      res.status(401).json({
+        message:
+          "Your Google Photos connection needs to be refreshed. Please reconnect.",
+        needsReconnect: true,
+      });
+      return;
+    }
 
-    res.json(photos);
+    // Get photos using token manager for authentication
+    try {
+      const photos = await googlePhotosService.getAlbumPhotos(userId, albumId);
+      res.json(photos);
+    } catch (error) {
+      // If the error is related to authentication
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+
+      if (
+        errorMessage.includes("refresh") ||
+        errorMessage.includes("reconnect")
+      ) {
+        // Update user status to needs_reconnect
+        await User.findByIdAndUpdate(userId, {
+          $set: { "googlePhotos.connectionStatus": "needs_reconnect" },
+        });
+
+        res.status(401).json({
+          message:
+            "Your Google Photos connection needs to be refreshed. Please reconnect.",
+          needsReconnect: true,
+        });
+      } else {
+        throw error; // Re-throw for general error handling
+      }
+    }
   } catch (error) {
     console.error("Error retrieving album photos:", error);
     res.status(500).json({ message: "Failed to retrieve album photos" });
@@ -317,6 +480,7 @@ export const disconnectGooglePhotos = async (
 
 /**
  * Get a random photo from user's selected album
+ * Uses token manager for automatic token refresh
  */
 export const getRandomRewardPhoto = async (
   req: AuthenticatedRequest,
@@ -331,7 +495,7 @@ export const getRandomRewardPhoto = async (
       return;
     }
 
-    // Get user with tokens and selected album
+    // Get user to check connection status
     const user = await User.findById(userId);
 
     if (!user?.googlePhotos?.tokens) {
@@ -349,26 +513,63 @@ export const getRandomRewardPhoto = async (
       return;
     }
 
-    // Set credentials and get photos
-    googlePhotosService.setCredentials(user.googlePhotos.tokens);
-    const photosResponse = await googlePhotosService.getAlbumPhotos(
-      user.googlePhotos.selectedAlbumId
-    );
-
-    if (!photosResponse.mediaItems || photosResponse.mediaItems.length === 0) {
-      res
-        .status(404)
-        .json({ message: "No photos found in the selected album" });
+    // Check connection status
+    if (user.googlePhotos.connectionStatus === "needs_reconnect") {
+      res.status(401).json({
+        message:
+          "Your Google Photos connection needs to be refreshed. Please reconnect.",
+        needsReconnect: true,
+      });
       return;
     }
 
-    // Get a random photo
-    const randomIndex = Math.floor(
-      Math.random() * photosResponse.mediaItems.length
-    );
-    const randomPhoto = photosResponse.mediaItems[randomIndex];
+    // Get photos using token manager for authentication
+    try {
+      const photosResponse = await googlePhotosService.getAlbumPhotos(
+        userId,
+        user.googlePhotos.selectedAlbumId
+      );
 
-    res.json({ photo: randomPhoto });
+      if (
+        !photosResponse.mediaItems ||
+        photosResponse.mediaItems.length === 0
+      ) {
+        res
+          .status(404)
+          .json({ message: "No photos found in the selected album" });
+        return;
+      }
+
+      // Get a random photo
+      const randomIndex = Math.floor(
+        Math.random() * photosResponse.mediaItems.length
+      );
+      const randomPhoto = photosResponse.mediaItems[randomIndex];
+
+      res.json({ photo: randomPhoto });
+    } catch (error) {
+      // If the error is related to authentication
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+
+      if (
+        errorMessage.includes("refresh") ||
+        errorMessage.includes("reconnect")
+      ) {
+        // Update user status to needs_reconnect
+        await User.findByIdAndUpdate(userId, {
+          $set: { "googlePhotos.connectionStatus": "needs_reconnect" },
+        });
+
+        res.status(401).json({
+          message:
+            "Your Google Photos connection needs to be refreshed. Please reconnect.",
+          needsReconnect: true,
+        });
+      } else {
+        throw error; // Re-throw for general error handling
+      }
+    }
   } catch (error) {
     console.error("Error retrieving reward photo:", error);
     res.status(500).json({ message: "Failed to retrieve reward photo" });
