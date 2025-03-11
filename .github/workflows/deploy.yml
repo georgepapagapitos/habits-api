@@ -1,79 +1,44 @@
-name: Deploy API
+name: API CI
 
 on:
   push:
     branches:
-      - main # Deploy to production on main branch push
-      - staging # Deploy to staging on staging branch push
-  workflow_dispatch: # Allow manual trigger
+      - main
+      - staging
+  pull_request:
+    branches:
+      - main
+      - staging
+  workflow_dispatch:
 
 jobs:
-  deploy:
-    name: Deploy to ${{ github.ref == 'refs/heads/main' && 'Production' || 'Staging' }}
-    runs-on: self-hosted
+  test:
+    runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set environment variables
-        id: env
-        run: |
-          if [[ ${{ github.ref }} == 'refs/heads/main' ]]; then
-            echo "DEPLOY_ENV=prod" >> $GITHUB_ENV
-            echo "DEPLOY_PATH=/var/www/habits-api/production" >> $GITHUB_ENV
-          else
-            echo "DEPLOY_ENV=staging" >> $GITHUB_ENV
-            echo "DEPLOY_PATH=/var/www/habits-api/staging" >> $GITHUB_ENV
-          fi
-
-      - name: Print environment info
-        run: |
-          echo "Deploying to ${{ env.DEPLOY_ENV }} environment"
-          echo "Deploy path: ${{ env.DEPLOY_PATH }}"
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Run tests
-        run: npm test
+      - name: Run linting
+        run: npm run lint || true
 
-      - name: TypeCheck
+      - name: Run type check
         run: npm run typecheck
 
-      - name: Deploy application
-        run: |
-          # Create deploy directory if it doesn't exist
-          mkdir -p ${{ env.DEPLOY_PATH }}
-
-          # Copy files to deployment directory
-          rsync -av --exclude='.git' --exclude='node_modules' . ${{ env.DEPLOY_PATH }}/
-
-          # Install production dependencies
-          cd ${{ env.DEPLOY_PATH }}
-          npm ci --production
-
-          # Build the application
-          npm run build
-
-          # Start or restart the application with Docker
-          ./scripts/deploy.sh ${{ env.DEPLOY_ENV }} down || true
-          ./scripts/deploy.sh ${{ env.DEPLOY_ENV }} build
-          ./scripts/deploy.sh ${{ env.DEPLOY_ENV }} up
-
-      - name: Verify deployment
-        run: |
-          # Wait for the service to start
-          sleep 10
-
-          # Check if the service is running
-          if [[ "${{ env.DEPLOY_ENV }}" == "prod" ]]; then
-            curl -f http://localhost:5050/api/health || exit 1
-          else
-            curl -f http://localhost:5051/api/health || exit 1
-          fi
+      - name: Run tests
+        run: npm test
+        env:
+          JWT_SECRET: ${{ secrets.JWT_SECRET || 'test-jwt-secret' }}
+          MONGODB_URI: ${{ secrets.MONGODB_URI || 'mongodb://localhost:27017/test-db' }}
 
       - name: Notify on success
         if: success()
-        run: |
-          echo "Deployment to ${{ env.DEPLOY_ENV }} completed successfully!"
+        run: echo "All tests passed successfully!"
