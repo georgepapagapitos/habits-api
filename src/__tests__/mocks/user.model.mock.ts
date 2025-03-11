@@ -7,4 +7,6 @@ export const User = {
       email: "test@example.com",
     }),
   }),
+  findOne: jest.fn(),
+  create: jest.fn(),
 };
