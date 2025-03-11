@@ -73,6 +73,11 @@ const habitSchema = new Schema<HabitDocument>(
       type: String,
       default: "UTC",
     },
+    // Show reward when habit is completed
+    showReward: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,
@@ -200,9 +205,7 @@ habitSchema.pre("save", function (next) {
     // Get the most recent completion
     const mostRecentCompletion = completedDatesInTz[0];
     const yesterday = subDays(todayStart, 1);
-    const isCompletedYesterday = completedDatesInTz.some((date) =>
-      isSameDay(date, yesterday)
-    );
+    // Check if yesterday's completion status is needed for streak calculation
     const isYesterdayDue = frequencyIndices.includes(getDay(yesterday));
     console.log(`Is yesterday due: ${isYesterdayDue}`);
 
