@@ -1,6 +1,7 @@
 import cron from "node-cron";
 import { Habit } from "../models/habit.model";
 import { User } from "../models/user.model";
+import { logger } from "./logger";
 
 /**
  * Schedule jobs to run at specific intervals
@@ -8,7 +9,7 @@ import { User } from "../models/user.model";
 export const setupScheduler = () => {
   // Run at midnight every day
   cron.schedule("0 0 * * *", async () => {
-    console.log("Running daily habit check...");
+    logger.info("Running daily habit check...");
     await resetDailyHabitStatus();
   });
 };
@@ -32,7 +33,7 @@ const resetDailyHabitStatus = async () => {
     ];
     const todayName = daysOfWeek[dayOfWeek];
 
-    console.log(`Today is ${todayName}`);
+    logger.debug(`Today is ${todayName}`);
 
     // Get all active users
     const users = await User.find({});
@@ -45,7 +46,7 @@ const resetDailyHabitStatus = async () => {
         frequency: { $in: [todayName] },
       });
 
-      console.log(
+      logger.debug(
         `User ${user.username} has ${habits.length} habits due today`
       );
 
@@ -67,8 +68,8 @@ const resetDailyHabitStatus = async () => {
       }
     }
 
-    console.log("Daily habit check completed");
+    logger.info("Daily habit check completed");
   } catch (error) {
-    console.error("Error running daily habit check:", error);
+    logger.error("Error running daily habit check:", error);
   }
 };

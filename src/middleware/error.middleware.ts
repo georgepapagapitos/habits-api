@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import { sendErrorResponse } from "../utils/error.utils";
+import { logger } from "../utils/logger";
 
 // Custom error class
 export class AppError extends Error {
@@ -40,6 +41,22 @@ export const errorHandler = (
   } else if (err.name === "CastError") {
     statusCode = 400;
     message = "Invalid ID format";
+  }
+
+  // Log the error with appropriate severity
+  if (statusCode >= 500) {
+    logger.error(`[${statusCode}] ${message}`, {
+      path: req.path,
+      method: req.method,
+      stack,
+      error: err,
+    });
+  } else {
+    // Client errors (4xx) as warnings
+    logger.warn(`[${statusCode}] ${message}`, {
+      path: req.path,
+      method: req.method,
+    });
   }
 
   // Use the sendErrorResponse utility
