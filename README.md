@@ -67,8 +67,8 @@ A RESTful API for the Habits application built with Node.js, Express, TypeScript
 1. Clone the repository
 
    ```bash
-   git clone https://github.com/georgepapagapitos/hannahs-habits.git
-   cd hannahs-habits/habits-api
+   git clone https://github.com/georgepapagapitos/habits-api.git
+   cd habits-api
    ```
 
 2. Install dependencies
