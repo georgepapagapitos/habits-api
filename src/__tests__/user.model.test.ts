@@ -1,8 +1,12 @@
 import * as bcrypt from "bcryptjs";
 
 // Create a user model mock
-const mockValidate = jest.fn().mockImplementation(function (this: any) {
-  const errors: any = {};
+const mockValidate = jest.fn().mockImplementation(function (this: {
+  name?: string;
+  email?: string;
+  password?: string;
+}) {
+  const errors: Record<string, { message: string }> = {};
   if (!this.name) errors.name = { message: "Name is required" };
   if (!this.email) errors.email = { message: "Email is required" };
   if (!this.password) errors.password = { message: "Password is required" };
@@ -15,7 +19,7 @@ class MockUser {
   email?: string;
   password?: string;
 
-  constructor(data: any = {}) {
+  constructor(data: { name?: string; email?: string; password?: string } = {}) {
     this.name = data.name;
     this.email = data.email;
     this.password = data.password;
@@ -38,9 +42,7 @@ class MockUser {
 jest.mock("bcryptjs", () => ({
   hash: jest
     .fn()
-    .mockImplementation((password, salt) =>
-      Promise.resolve(`hashed_${password}`)
-    ),
+    .mockImplementation((password) => Promise.resolve(`hashed_${password}`)),
   compare: jest
     .fn()
     .mockImplementation((password, hash) =>
