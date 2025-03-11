@@ -6,7 +6,8 @@ A RESTful API for the Habits application built with Node.js, Express, TypeScript
 
 - 🔐 JWT-based authentication
 - 🔍 CRUD operations for habits
-- 📊 Track habit completion data
+- 📊 Track habit completion data and streaks
+- 📸 Google Photos integration for habit completion rewards
 - 🛡️ Input validation and error handling
 - 📝 Type safety with TypeScript
 - 🧪 Comprehensive test suite
@@ -20,9 +21,13 @@ A RESTful API for the Habits application built with Node.js, Express, TypeScript
 - **Framework**: Express.js
 - **Database**: MongoDB with Mongoose ODM
 - **Authentication**: JWT (JSON Web Tokens)
-- **Validation**: express-validator
+- **Validation**: express-validator, Joi
 - **Security**: helmet, cors, rate limiting
+- **Logging**: Custom logger utility
+- **Date Handling**: date-fns
+- **External APIs**: Google Photos API
 - **Environment**: dotenv for configuration
+- **Scheduling**: node-cron
 - **Containerization**: Docker
 
 ## API Endpoints
@@ -42,6 +47,12 @@ A RESTful API for the Habits application built with Node.js, Express, TypeScript
 - `PATCH /api/habits/:id/toggle` - Toggle a habit's completion status for today
 - `PATCH /api/habits/:id/toggle/:date` - Toggle a habit's completion status for a specific date
 
+### Photos (Google Photos Integration)
+
+- `GET /api/photos/random` - Get a random photo from the configured album
+- `GET /api/photos/auth` - Generate the OAuth URL for initial setup (admin only)
+- `GET /api/photos/oauth2callback` - Handle OAuth callback from Google (admin only)
+
 ## Getting Started
 
 ### Prerequisites
@@ -49,14 +60,15 @@ A RESTful API for the Habits application built with Node.js, Express, TypeScript
 - Node.js (v18+)
 - MongoDB (local installation or MongoDB Atlas account)
 - npm or yarn
+- Google Cloud account (for Google Photos integration, optional)
 
 ### Installation
 
 1. Clone the repository
 
    ```bash
-   git clone https://github.com/georgepapagapitos/habits-api.git
-   cd habits-api
+   git clone https://github.com/georgepapagapitos/hannahs-habits.git
+   cd hannahs-habits/habits-api
    ```
 
 2. Install dependencies
@@ -74,6 +86,15 @@ A RESTful API for the Habits application built with Node.js, Express, TypeScript
    MONGODB_URI=mongodb://localhost:27017/habits
    JWT_SECRET=your_jwt_secret_key
    NODE_ENV=development
+
+   # Google Photos Integration (optional)
+   GOOGLE_CLIENT_ID=your_client_id
+   GOOGLE_CLIENT_SECRET=your_client_secret
+   GOOGLE_REDIRECT_URI=http://localhost:5050/api/photos/oauth2callback
+   GOOGLE_ACCESS_TOKEN=your_access_token
+   GOOGLE_REFRESH_TOKEN=your_refresh_token
+   GOOGLE_TOKEN_EXPIRY=token_expiry_timestamp
+   GOOGLE_PHOTOS_ALBUM_ID=your_album_id
    ```
 
 4. Start the development server
@@ -93,10 +114,20 @@ A RESTful API for the Habits application built with Node.js, Express, TypeScript
 - `npm start` - Start the production server
 - `npm run lint` - Run ESLint
 - `npm run lint:fix` - Fix ESLint errors automatically
+- `npm run typecheck` - Run TypeScript type checking
+- `npm run format` - Format code with Prettier
 - `npm test` - Run tests
 - `npm run test:all` - Run all tests including those that may need fixes
 - `npm run test:coverage` - Run tests with coverage report
 - `npm run test:watch` - Run tests in watch mode
+- `npm run test:focused` - Run focused tests in watch mode with bail
+- `npm run test:controllers` - Run only controller tests
+- `npm run test:services` - Run only service tests
+- `npm run test:unit` - Run only unit tests
+- `npm run test:integration` - Run only integration tests
+- `npm run test:optimized` - Run tests with optimized settings
+- `npm run test:ci` - Run tests in CI environment
+- `npm run seed` - Seed test data
 
 ## Testing
 
@@ -154,20 +185,24 @@ habits-api/
 ├── dist/              # Compiled JavaScript files
 ├── src/
 │   ├── __tests__/     # Test files
+│   │   ├── app-integration.test.ts     # App integration tests
 │   │   ├── streak-calculation.spec.ts  # Tests for streak calculation
 │   │   ├── habit.frequency.spec.ts     # Tests for habit frequency
 │   │   ├── habit.utils.spec.ts         # Tests for utility functions
 │   │   ├── auth.middleware.spec.ts     # Tests for auth middleware
 │   │   ├── environment.spec.ts         # Tests for environment config
+│   │   ├── mocks/                      # Test mocks
 │   │   └── ...
 │   ├── config/        # Configuration files
 │   │   ├── db.ts      # Database connection
 │   │   └── env.ts     # Environment variables
 │   ├── controllers/   # Request handlers
 │   │   ├── auth.controller.ts
-│   │   └── habit.controller.ts
+│   │   ├── habit.controller.ts
+│   │   └── photo.controller.ts
 │   ├── middleware/    # Custom middleware
 │   │   ├── auth.middleware.ts
+│   │   ├── auth.validation.ts
 │   │   └── error.middleware.ts
 │   ├── models/        # Mongoose models
 │   │   ├── habit.model.ts
@@ -175,19 +210,30 @@ habits-api/
 │   ├── routes/        # API routes
 │   │   ├── auth.routes.ts
 │   │   ├── habit.routes.ts
+│   │   ├── photo.routes.ts
 │   │   └── index.ts
+│   ├── services/      # Service layers
+│   │   └── google-photos.service.ts
 │   ├── types/         # TypeScript interfaces
 │   │   ├── habit.types.ts
-│   │   └── user.types.ts
+│   │   ├── user.types.ts
+│   │   └── photo.types.ts
 │   ├── utils/         # Utility functions
 │   │   ├── error.utils.ts
+│   │   ├── logger.ts
 │   │   └── scheduler.ts
 │   ├── app.ts         # Express app setup
 │   └── server.ts      # Server entry point
 ├── .env               # Environment variables (not in version control)
-├── .github/workflows/ # CI/CD configuration
-│   ├── test.yml       # Test workflow
-│   └── build.yml      # Build and deployment workflow
+├── scripts/           # Helper scripts
+│   ├── run-tests.sh   # Optimized test runner
+│   └── seed-test-data.ts  # Database seeding script
+├── __test__/          # Test setup
+│   └── setup.ts       # Test setup configuration
+├── docs/              # Documentation files
+│   ├── development/   # Developer guides
+│   ├── integrations/  # Integration documentation
+│   └── testing/       # Testing documentation
 ├── Dockerfile         # Docker configuration
 ├── docker-compose.yml # Docker Compose configuration
 ├── jest.config.js     # Jest configuration
@@ -255,12 +301,19 @@ Authorization: Bearer <your_jwt_token>
 
 ## Environment Variables
 
-| Variable    | Description                     | Default Value              |
-| ----------- | ------------------------------- | -------------------------- |
-| PORT        | Port to run the server          | 5050                       |
-| MONGODB_URI | MongoDB connection string       | mongodb://localhost/habits |
-| JWT_SECRET  | Secret for JWT token generation | (required)                 |
-| NODE_ENV    | Environment (dev/prod)          | development                |
+| Variable               | Description                     | Default Value                                   | Required   |
+| ---------------------- | ------------------------------- | ----------------------------------------------- | ---------- |
+| PORT                   | Port to run the server          | 5050                                            | Yes        |
+| MONGODB_URI            | MongoDB connection string       | mongodb://localhost/habits                      | Yes        |
+| JWT_SECRET             | Secret for JWT token generation | (no default)                                    | Yes        |
+| NODE_ENV               | Environment (dev/prod)          | development                                     | Yes        |
+| GOOGLE_CLIENT_ID       | Google OAuth client ID          | (no default)                                    | For Photos |
+| GOOGLE_CLIENT_SECRET   | Google OAuth client secret      | (no default)                                    | For Photos |
+| GOOGLE_REDIRECT_URI    | OAuth callback URL              | http://localhost:5050/api/photos/oauth2callback | For Photos |
+| GOOGLE_ACCESS_TOKEN    | OAuth access token              | (no default)                                    | For Photos |
+| GOOGLE_REFRESH_TOKEN   | OAuth refresh token             | (no default)                                    | For Photos |
+| GOOGLE_TOKEN_EXPIRY    | OAuth token expiry timestamp    | (no default)                                    | For Photos |
+| GOOGLE_PHOTOS_ALBUM_ID | Google Photos album ID          | (no default)                                    | For Photos |
 
 ## Contributing
 
