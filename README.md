@@ -13,6 +13,8 @@ A RESTful API for the Habits application built with Node.js, Express, TypeScript
 - 🧪 Comprehensive test suite
 - 🔄 Continuous integration testing
 - 🚀 Docker support for easy deployment
+- 🔁 PM2 process management for reliability and scalability
+- ⚡ Node.js 20+ compatibility
 
 ## Tech Stack
 
@@ -28,6 +30,7 @@ A RESTful API for the Habits application built with Node.js, Express, TypeScript
 - **External APIs**: Google Photos API
 - **Environment**: dotenv for configuration
 - **Scheduling**: node-cron
+- **Process Management**: PM2
 - **Containerization**: Docker
 
 ## API Endpoints
@@ -57,7 +60,7 @@ A RESTful API for the Habits application built with Node.js, Express, TypeScript
 
 ### Prerequisites
 
-- Node.js (v18+)
+- Node.js (v20+)
 - MongoDB (local installation or MongoDB Atlas account)
 - npm or yarn
 - Google Cloud account (for Google Photos integration, optional)
@@ -112,6 +115,9 @@ A RESTful API for the Habits application built with Node.js, Express, TypeScript
 - `npm run dev` - Start the development server with hot reloading
 - `npm run build` - Compile TypeScript to JavaScript
 - `npm start` - Start the production server
+- `npm run start:pm2` - Start the server using PM2 process manager
+- `npm run stop:pm2` - Stop the PM2-managed server
+- `npm run restart:pm2` - Restart the PM2-managed server
 - `npm run lint` - Run ESLint
 - `npm run lint:fix` - Fix ESLint errors automatically
 - `npm run typecheck` - Run TypeScript type checking
@@ -161,7 +167,7 @@ Tests run automatically on every push and pull request through GitHub Actions, e
 
 ## Docker Support
 
-The API includes Docker configuration for easy deployment:
+The API includes Docker configuration for easy deployment with built-in PM2 process management:
 
 ### Using Docker Compose
 
@@ -177,6 +183,13 @@ This will start both the API server and a MongoDB instance.
 docker build -t habits-api .
 docker run -p 5050:5050 habits-api
 ```
+
+The Dockerfile is configured to use PM2 for process management in production, which provides:
+
+- Clustering (multiple instances for improved performance)
+- Auto-restart on failure
+- Runtime monitoring
+- Memory threshold monitoring
 
 ## Project Structure
 
@@ -234,6 +247,7 @@ habits-api/
 │   ├── development/   # Developer guides
 │   ├── integrations/  # Integration documentation
 │   └── testing/       # Testing documentation
+├── ecosystem.config.js # PM2 process manager configuration
 ├── Dockerfile         # Docker configuration
 ├── docker-compose.yml # Docker Compose configuration
 ├── jest.config.js     # Jest configuration
@@ -298,6 +312,7 @@ Authorization: Bearer <your_jwt_token>
 
 - **Development Guides**
   - [Utilities Documentation](./docs/development/utilities.md) - Guide to using logger, error handling, and scheduler utilities
+  - [Punycode Resolution](./docs/development/punycode-issue.md) - Guide to resolving punycode deprecation issues in Node.js 20+
 
 ## Environment Variables
 
@@ -307,6 +322,7 @@ Authorization: Bearer <your_jwt_token>
 | MONGODB_URI            | MongoDB connection string       | mongodb://localhost/habits                      | Yes        |
 | JWT_SECRET             | Secret for JWT token generation | (no default)                                    | Yes        |
 | NODE_ENV               | Environment (dev/prod)          | development                                     | Yes        |
+| NODE_NO_WARNINGS       | Suppress Node.js warnings       | 1                                               | No         |
 | GOOGLE_CLIENT_ID       | Google OAuth client ID          | (no default)                                    | For Photos |
 | GOOGLE_CLIENT_SECRET   | Google OAuth client secret      | (no default)                                    | For Photos |
 | GOOGLE_REDIRECT_URI    | OAuth callback URL              | http://localhost:5050/api/photos/oauth2callback | For Photos |

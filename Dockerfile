@@ -12,8 +12,6 @@ WORKDIR /app
 COPY package*.json ./
 COPY .npmrc ./
 RUN npm ci
-# Fix punycode issue in Node.js 20
-RUN npm install @tahul/punycode@2.3.4 -g
 
 # Copy source code and configuration files
 COPY . .
@@ -36,13 +34,17 @@ WORKDIR /app
 COPY package*.json ./
 COPY .npmrc ./
 ENV NODE_ENV=production
+ENV NODE_NO_WARNINGS=1
 RUN npm ci --omit=dev --ignore-scripts
-# Fix punycode issue in Node.js 20
-RUN npm install @tahul/punycode@2.3.4 -g
 
 # Copy build artifacts from builder stage
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/ecosystem.config.js ./ecosystem.config.js
+
+# Install PM2 globally for production
+RUN npm install -g pm2
 
 EXPOSE 5050
 
-CMD ["node", "dist/server.js"]
+# Use PM2 in production for better process management
+CMD ["pm2-runtime", "ecosystem.config.js"]
