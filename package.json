@@ -42,6 +42,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@tahul/punycode": "^2.3.4",
     "axios": "^1.8.2",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",

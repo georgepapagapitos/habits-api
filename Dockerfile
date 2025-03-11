@@ -10,7 +10,10 @@ WORKDIR /app
 
 # Copy package files and install dependencies
 COPY package*.json ./
+COPY .npmrc ./
 RUN npm ci
+# Fix punycode issue in Node.js 20
+RUN npm install @tahul/punycode@2.3.4 -g
 
 # Copy source code and configuration files
 COPY . .
@@ -31,8 +34,11 @@ WORKDIR /app
 
 # Copy package files and install production dependencies only
 COPY package*.json ./
+COPY .npmrc ./
 ENV NODE_ENV=production
 RUN npm ci --omit=dev --ignore-scripts
+# Fix punycode issue in Node.js 20
+RUN npm install @tahul/punycode@2.3.4 -g
 
 # Copy build artifacts from builder stage
 COPY --from=builder /app/dist ./dist
