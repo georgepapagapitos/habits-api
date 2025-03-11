@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import { MONGODB_URI } from "./env";
+import { logger } from "../utils/logger";
 
 // Suppress strictQuery warning
 mongoose.set("strictQuery", false);
@@ -13,9 +14,9 @@ export const connectDB = async (): Promise<void> => {
     }
 
     await mongoose.connect(MONGODB_URI);
-    console.log("MongoDB connected successfully");
+    logger.info("MongoDB connected successfully");
   } catch (error) {
-    console.error("MongoDB connection error:", error);
+    logger.error("MongoDB connection error:", error);
     process.exit(1);
   }
 };
@@ -23,8 +24,8 @@ export const connectDB = async (): Promise<void> => {
 export const disconnectDB = async (): Promise<void> => {
   try {
     await mongoose.disconnect();
-    console.log("MongoDB disconnected");
+    logger.info("MongoDB disconnected");
   } catch (error) {
-    console.error("MongoDB disconnection error:", error);
+    logger.error("MongoDB disconnection error:", error);
   }
 };
