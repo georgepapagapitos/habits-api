@@ -11,19 +11,16 @@ This guide provides best practices for keeping the test suite fast and efficient
 
 ## Running Tests Efficiently
 
-### New Test Commands
+### Optimized Test Commands
 
-We've added several new commands to run tests more efficiently:
+We've added several commands to run tests more efficiently:
 
 - `npm run test:fast`: Runs tests sequentially with early termination on failure
 - `npm run test:focused`: Runs tests in watch mode with early termination
-- `npm run test:controllers`: Only runs controller tests
-- `npm run test:services`: Only runs service tests
-- `npm run test:projects`: Runs tests in project groups
+- `npm run test:parallel`: Runs tests in parallel with max 50% of CPU cores
+- `npm run test:optimized`: Uses an intelligent runner script to optimize test execution
 - `npm run test:changed`: Only runs tests for changed files
-- `npm run test:failfast`: Stops on first test failure
-- `npm run test:unit`: Only runs unit tests (excludes integration tests)
-- `npm run test:integration`: Only runs integration tests
+- `npm run test:quiet`: Uses a silent reporter with minimal output
 
 ### Jest Optimizations
 
