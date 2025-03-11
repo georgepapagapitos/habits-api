@@ -169,13 +169,46 @@ Tests run automatically on every push and pull request through GitHub Actions, e
 
 The API includes Docker configuration for easy deployment with built-in PM2 process management:
 
-### Using Docker Compose
+### Deployment Environments
+
+The project supports three deployment environments:
+
+1. **Development** - For local development
+2. **Staging** - For testing before production
+3. **Production** - For live deployment
+
+### Using the Deployment Script
+
+The project includes a deployment script to manage different environments:
 
 ```bash
-docker-compose up
+# Make the script executable
+chmod +x scripts/deploy.sh
+
+# Start staging environment
+./scripts/deploy.sh staging up
+
+# Build production environment
+./scripts/deploy.sh prod build
+
+# View logs for staging environment
+./scripts/deploy.sh staging logs
+
+# Stop development environment
+./scripts/deploy.sh dev down
 ```
 
-This will start both the API server and a MongoDB instance.
+Run `./scripts/deploy.sh` without arguments for more options.
+
+### Manual Docker Compose Usage
+
+```bash
+# Production
+docker-compose up
+
+# Staging
+docker-compose -f docker-compose.staging.yml up
+```
 
 ### Building and Running the Docker Image
 
