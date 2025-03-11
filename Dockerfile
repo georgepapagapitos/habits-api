@@ -10,7 +10,6 @@ WORKDIR /app
 
 # Copy package files and install dependencies
 COPY package*.json ./
-COPY .npmrc ./
 RUN npm ci
 
 # Copy source code and configuration files
@@ -32,19 +31,12 @@ WORKDIR /app
 
 # Copy package files and install production dependencies only
 COPY package*.json ./
-COPY .npmrc ./
 ENV NODE_ENV=production
-ENV NODE_NO_WARNINGS=1
 RUN npm ci --omit=dev --ignore-scripts
 
 # Copy build artifacts from builder stage
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/ecosystem.config.js ./ecosystem.config.js
-
-# Install PM2 globally for production
-RUN npm install -g pm2
 
 EXPOSE 5050
 
-# Use PM2 in production for better process management
-CMD ["pm2-runtime", "ecosystem.config.js"]
+CMD ["node", "dist/server.js"]

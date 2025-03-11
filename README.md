@@ -312,7 +312,6 @@ Authorization: Bearer <your_jwt_token>
 
 - **Development Guides**
   - [Utilities Documentation](./docs/development/utilities.md) - Guide to using logger, error handling, and scheduler utilities
-  - [Punycode Resolution](./docs/development/punycode-issue.md) - Guide to resolving punycode deprecation issues in Node.js 20+
 
 ## Environment Variables
 
