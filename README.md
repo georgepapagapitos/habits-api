@@ -102,27 +102,23 @@ A RESTful API for the Habits application built with Node.js, Express, TypeScript
 
 The API includes a comprehensive test suite built with Jest to ensure functionality and prevent regressions.
 
+For detailed information about testing, see:
+
+- [Testing Guide](./docs/testing/testing-guide.md)
+- [Test Optimization](./docs/testing/test-optimization.md)
+- [Test Coverage Plan](./docs/testing/test-coverage.md)
+
 ### Running Tests
 
 ```bash
 # Run all functioning tests
 npm test
 
-# Run all tests (including potentially broken ones)
-npm run test:all
-
 # Run tests with coverage report
 npm run test:coverage
+
+# See more specialized test commands in the testing guide
 ```
-
-### Test Structure
-
-The test suite is organized into several categories:
-
-- **Core Functionality Tests**: Tests for critical business logic like streak calculation, habit frequency, and date handling
-- **Authentication Tests**: Tests for JWT token generation, user model, and auth middleware
-- **API Tests**: Tests for controller endpoints and request handling
-- **Infrastructure Tests**: Tests for configuration, error handling, and validation
 
 ### Continuous Integration
 
@@ -199,9 +195,11 @@ habits-api/
 └── tsconfig.json      # TypeScript configuration
 ```
 
-## API Documentation
+## Documentation
 
-### Habit Object
+### API Documentation
+
+#### Habit Object
 
 A habit object has the following structure:
 
@@ -224,7 +222,7 @@ A habit object has the following structure:
 }
 ```
 
-## Error Handling
+#### Error Handling
 
 The API uses a consistent error response format:
 
@@ -238,13 +236,22 @@ The API uses a consistent error response format:
 }
 ```
 
-## Authentication
+### Authentication
 
 The API uses JWT (JSON Web Tokens) for authentication. To access protected endpoints, include the JWT token in the Authorization header:
 
 ```
 Authorization: Bearer <your_jwt_token>
 ```
+
+### Additional Documentation
+
+- **Integrations**
+
+  - [Google Photos Integration](./docs/integrations/google-photos.md) - Setup and usage guide for Google Photos integration
+
+- **Development Guides**
+  - [Utilities Documentation](./docs/development/utilities.md) - Guide to using logger, error handling, and scheduler utilities
 
 ## Environment Variables
 
