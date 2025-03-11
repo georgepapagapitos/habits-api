@@ -29,11 +29,15 @@ export const photoController = {
   // Get a random photo from the configured album
   getRandomPhoto: async (req: Request, res: Response): Promise<void> => {
     try {
-      // Check for a seed parameter for deterministic selection
+      // Check if a seed parameter was provided
       const seed = req.query.seed ? Number(req.query.seed) : undefined;
 
       if (seed !== undefined) {
-        console.log(`Using deterministic seed for photo selection: ${seed}`);
+        console.log(
+          `Using provided seed for deterministic photo selection: ${seed}`
+        );
+      } else {
+        console.log(`No seed provided, using random photo selection`);
       }
 
       const photo = await getRandomPhoto(seed);

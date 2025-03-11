@@ -488,11 +488,33 @@ export const habitController = {
               "../services/google-photos.service"
             );
 
-            // Pass the seed if available for deterministic photo selection
-            rewardPhoto = await getRandomPhoto(seed ? Number(seed) : undefined);
+            // Generate a consistent seed based on habit ID and the current date
+            // This ensures the same habit gets the same photo on a given day
+            // but different photos on different days
+            const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD format
+
+            // Create a deterministic hash from habit ID + date
+            let dateSeed = 0;
+            for (let i = 0; i < today.length; i++) {
+              dateSeed = (dateSeed << 5) - dateSeed + today.charCodeAt(i);
+              dateSeed |= 0; // Convert to 32bit integer
+            }
+
+            // Combine with habit ID for uniqueness across habits
+            let habitSeed = dateSeed;
+            for (let i = 0; i < req.params.id.length; i++) {
+              habitSeed =
+                (habitSeed << 5) - habitSeed + req.params.id.charCodeAt(i);
+              habitSeed |= 0; // Convert to 32bit integer
+            }
+
+            // Use the consistent seed for deterministic photo selection within a day
+            const consistentSeed = Math.abs(habitSeed);
+            rewardPhoto = await getRandomPhoto(consistentSeed);
 
             console.log(
-              "Successfully fetched reward photo:",
+              "Successfully fetched reward photo with consistent seed:",
+              consistentSeed,
               rewardPhoto ? "Present" : "Null"
             );
             if (rewardPhoto) {

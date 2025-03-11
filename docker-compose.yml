@@ -2,9 +2,9 @@ version: "3.8"
 
 services:
   # Backend service
-  habits-api:
+  backend:
     build: .
-    container_name: habits-api
+    container_name: backend
     restart: unless-stopped
     ports:
       - "5050:5050"
@@ -24,16 +24,16 @@ services:
       - app-network
 
   # Frontend service
-  habits-ui:
+  frontend:
     build: ../habits-ui
-    container_name: habits-ui
+    container_name: frontend
     restart: unless-stopped
     ports:
       - "5173:80"
     depends_on:
-      - habits-api
+      - backend
     networks:
-      - habits-app-network
+      - app-network
 
 # Network for all services
 networks:

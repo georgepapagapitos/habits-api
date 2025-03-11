@@ -172,19 +172,20 @@ export const getRandomPhoto = async (
       return null;
     }
 
-    // If seed is provided, use it for deterministic selection
-    let randomIndex;
+    // If seed is provided, use it for deterministic selection (same photo for same day)
+    // This ensures consistency within a day but different photos across different days
+    let photoIndex;
 
     if (seed !== undefined) {
-      // Use a deterministic approach based on the seed
-      // This ensures the same habit + date combo always gets the same photo
-      randomIndex = Math.abs(seed) % mediaItems.length;
+      // Use the seed for deterministic selection - this is a hash of the habit ID + date
+      // This gives the same photo for the same habit+day combo
+      photoIndex = Math.abs(seed) % mediaItems.length;
     } else {
-      // Otherwise use true random selection
-      randomIndex = Math.floor(Math.random() * mediaItems.length);
+      // Otherwise, just pick a truly random photo
+      photoIndex = Math.floor(Math.random() * mediaItems.length);
     }
 
-    const randomPhoto = mediaItems[randomIndex] as GooglePhoto;
+    const randomPhoto = mediaItems[photoIndex] as GooglePhoto;
 
     // Create a modified URL with optimized parameters
     // =d -> download parameter (avoids CORS issues)
@@ -206,7 +207,8 @@ export const getRandomPhoto = async (
         : 0,
     };
 
-    // Add to cache if seed is provided
+    // Add to cache if seed is provided - still keep the cache for performance
+    // but we're not using the deterministic selection anymore
     if (seed !== undefined) {
       photoCache.set(seed, {
         photo: photoResponse,
