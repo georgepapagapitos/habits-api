@@ -42,12 +42,63 @@ const setCredentialsFromEnv = () => {
 interface CachedPhoto {
   photo: PhotoResponse;
   timestamp: number;
+  photoIndex: number; // Store which index was used
+  previousPhotoIndex?: number; // Store the previous day's photo index
 }
 
 const photoCache: Map<number, CachedPhoto> = new Map();
 
 // Cache TTL in milliseconds (24 hours)
 const PHOTO_CACHE_TTL = 24 * 60 * 60 * 1000;
+
+// A map to track previous day's photo indexes for each habit (by seed base)
+// Format: { habitKey -> { photoIndex, date } }
+interface PreviousPhotoRecord {
+  photoIndex: number;
+  date: string; // YYYY-MM-DD format
+}
+
+const previousDayPhotos: Map<string, PreviousPhotoRecord> = new Map();
+
+// Function to check and clean up outdated photo records
+const cleanupOldPhotoRecords = (): void => {
+  const today = new Date();
+  const todayString = `${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate()}`;
+
+  // No need to clean if we haven't accumulated records
+  if (previousDayPhotos.size === 0) return;
+
+  console.log(`Checking for old photo records. Today is ${todayString}`);
+
+  // Keep track of records to remove from other days
+  const recordsToUpdate: Array<{ key: string; record: PreviousPhotoRecord }> =
+    [];
+
+  // Find records from previous days
+  previousDayPhotos.forEach((record, key) => {
+    if (record.date !== todayString) {
+      recordsToUpdate.push({ key, record });
+    }
+  });
+
+  // Process any found records
+  if (recordsToUpdate.length > 0) {
+    console.log(
+      `Found ${recordsToUpdate.length} photo records from previous days`
+    );
+
+    for (const { key, record } of recordsToUpdate) {
+      // Move the record to the actual previousDay tracking
+      console.log(
+        `Updating record for ${key}: ${record.photoIndex} from ${record.date} -> ${todayString}`
+      );
+      previousDayPhotos.set(key, {
+        photoIndex: record.photoIndex,
+        date: todayString,
+      });
+    }
+  }
+};
 
 // Cache for media items to avoid frequent Google API calls
 // This will be refreshed periodically
@@ -145,6 +196,38 @@ const fetchMediaItems = async (): Promise<GooglePhoto[]> => {
   }
 };
 
+// Get a photo by ID
+export const getPhotoById = async (
+  photoId: string
+): Promise<GooglePhoto | null> => {
+  try {
+    // Ensure credentials are set
+    if (!setCredentialsFromEnv()) {
+      throw new Error("Google credentials not available");
+    }
+
+    // Get a fresh token
+    const token = await oauth2Client.getAccessToken();
+    const accessToken = token.token;
+
+    // Use axios to make the request directly to Google Photos API
+    const response = await axios.get(
+      `https://photoslibrary.googleapis.com/v1/mediaItems/${photoId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching photo by ID:", error);
+    return null;
+  }
+};
+
 // Get a random photo from the album with improved caching
 // If seed is provided, use it for deterministic selection
 export const getRandomPhoto = async (
@@ -172,47 +255,100 @@ export const getRandomPhoto = async (
       return null;
     }
 
-    // If seed is provided, use it for deterministic selection (same photo for same day)
-    // This ensures consistency within a day but different photos across different days
+    // Get a photo that's different from yesterday if possible
     let photoIndex;
+    let previousIndex: number | undefined;
 
     if (seed !== undefined) {
-      // Use the seed for deterministic selection - this is a hash of the habit ID + date
-      // This gives the same photo for the same habit+day combo
-      photoIndex = Math.abs(seed) % mediaItems.length;
+      // First, extract the habit ID portion from the seed
+      // The seed is typically a hash combining habit ID and date
+      // We need to identify which habit this is for tracking previous photos
+      const currentDate = new Date();
+      const dateString = `${currentDate.getFullYear()}-${currentDate.getMonth() + 1}-${currentDate.getDate()}`;
+
+      // Create a unique key for this habit by removing the date component
+      // This is based on how the seed is generated on the client (habit ID + date hash)
+      const habitKey = `habit-${Math.floor(seed / 1000000)}`; // Simplified extraction
+
+      // Run cleanup to check for date changes
+      cleanupOldPhotoRecords();
+
+      // Check if we have a record of yesterday's photo for this habit
+      if (previousDayPhotos.has(habitKey)) {
+        const prevRecord = previousDayPhotos.get(habitKey);
+        previousIndex = prevRecord?.photoIndex;
+        console.log(
+          `Previous day photo index for ${habitKey}: ${previousIndex} from ${prevRecord?.date}`
+        );
+      }
+
+      // Generate a deterministic index for today based on seed
+      const baseIndex = Math.abs(seed) % mediaItems.length;
+
+      // If we have a previous index and there are enough photos, ensure we pick a different one
+      if (previousIndex !== undefined && mediaItems.length > 1) {
+        // If the deterministic index would give the same photo as yesterday, shift it
+        if (baseIndex === previousIndex) {
+          // Pick a completely different photo instead of just the next one
+          // Create a random offset between 1 and half the collection size
+          const offset = Math.max(
+            1,
+            Math.floor(Math.random() * (mediaItems.length / 2))
+          );
+          photoIndex = (baseIndex + offset) % mediaItems.length;
+          console.log(
+            `Avoiding repeat photo. Shifted from ${baseIndex} to ${photoIndex} with offset ${offset}`
+          );
+        } else {
+          photoIndex = baseIndex;
+        }
+      } else {
+        photoIndex = baseIndex;
+      }
+
+      // Store this photo index for tomorrow's reference
+      // We store it with today's date so we know when to update it
+      previousDayPhotos.set(habitKey, {
+        photoIndex,
+        date: dateString,
+      });
+      console.log(
+        `Set photo index ${photoIndex} for ${habitKey} on ${dateString}`
+      );
     } else {
-      // Otherwise, just pick a truly random photo
+      // For truly random selection (no seed), just pick any random photo
       photoIndex = Math.floor(Math.random() * mediaItems.length);
     }
 
     const randomPhoto = mediaItems[photoIndex] as GooglePhoto;
 
-    // Create a modified URL with optimized parameters
-    // =d -> download parameter (avoids CORS issues)
-    // =w400-h400 -> resize to more optimized dimensions (loads faster)
-    // =c -> crop to requested size
-    const baseUrl = randomPhoto.baseUrl;
-    const optimizedUrl = `${baseUrl}=d-w400-h400-c`;
+    // Create the proxy URLs instead of direct Google Photos URLs
+    const baseUrl = `/api/photos/proxy/${randomPhoto.id}`;
+    const optimizedUrl = `${baseUrl}/400/400`;
+    const thumbnailUrl = `${baseUrl}/100/100`;
 
     // Create the response object with scaled dimensions
     const photoResponse = {
       id: randomPhoto.id,
       url: optimizedUrl,
-      thumbnailUrl: `${baseUrl}=d-w100-h100-c`, // Add a smaller thumbnail for faster initial loading
+      thumbnailUrl: thumbnailUrl,
       width: randomPhoto.mediaMetadata
         ? parseInt(randomPhoto.mediaMetadata.width || "0", 10)
         : 0,
       height: randomPhoto.mediaMetadata
         ? parseInt(randomPhoto.mediaMetadata.height || "0", 10)
         : 0,
+      // Include the original Google Photos baseUrl for reference but don't expose to frontend
+      _originalBaseUrl: randomPhoto.baseUrl,
     };
 
     // Add to cache if seed is provided - still keep the cache for performance
-    // but we're not using the deterministic selection anymore
     if (seed !== undefined) {
       photoCache.set(seed, {
         photo: photoResponse,
         timestamp: Date.now(),
+        photoIndex: photoIndex,
+        previousPhotoIndex: previousIndex,
       });
 
       // Prune cache if it gets too large (keep most recent 500 items)

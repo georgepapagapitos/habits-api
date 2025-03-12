@@ -126,10 +126,11 @@ describe("Google Photos Service", () => {
       // Verify result
       expect(result).toEqual({
         id: "photo1",
-        url: "https://example.com/photo1=d-w400-h400-c",
-        thumbnailUrl: "https://example.com/photo1=d-w100-h100-c",
+        url: "/api/photos/proxy/photo1/400/400",
+        thumbnailUrl: "/api/photos/proxy/photo1/100/100",
         width: 800,
         height: 600,
+        _originalBaseUrl: "https://example.com/photo1",
       });
 
       // Restore Math.random
@@ -172,10 +173,11 @@ describe("Google Photos Service", () => {
       // Verify result is the second photo
       expect(result).toEqual({
         id: "photo2",
-        url: "https://example.com/photo2=d-w400-h400-c",
-        thumbnailUrl: "https://example.com/photo2=d-w100-h100-c",
+        url: "/api/photos/proxy/photo2/400/400",
+        thumbnailUrl: "/api/photos/proxy/photo2/100/100",
         width: 1024,
         height: 768,
+        _originalBaseUrl: "https://example.com/photo2",
       });
     });
 

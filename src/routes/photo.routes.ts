@@ -36,6 +36,14 @@ const adminLimiter = rateLimit({
 // Protected route with generous rate limit - Get a random photo
 router.get("/random", photoLimiter, protect, photoController.getRandomPhoto);
 
+// Photo proxy route - serves image data through the API to avoid CORS issues
+// This route doesn't require authentication since it just serves images
+router.get(
+  "/proxy/:photoId/:width?/:height?",
+  photoLimiter,
+  photoController.proxyPhoto
+);
+
 // Admin routes - Used for initial setup only
 router.get("/auth", authLimiter, protect, photoController.getAuthUrl);
 router.get("/oauth2callback", authLimiter, photoController.handleOAuthCallback);
