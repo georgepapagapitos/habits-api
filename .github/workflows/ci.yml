@@ -2,51 +2,17 @@ name: API CI
 
 on:
   push:
-    branches-ignore: [main] # Run on all branches except main
+    branches-ignore: [main, staging] # Run on all branches except main and staging
   pull_request:
-    branches: [main] # Run on PRs targeting main
+    branches: [main, staging] # Run on PRs targeting main or staging
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "npm"
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run linting
-        run: npm run lint || true # Allow linting to fail without stopping workflow
-
-      - name: Run type check
-        run: npm run typecheck
-
-      - name: Build
-        run: npm run build
-
-      - name: Run tests
-        run: npm test
-        env:
-          JWT_SECRET: ${{ secrets.JWT_SECRET || 'test-secret' }}
-          MONGODB_URI: ${{ secrets.MONGODB_URI || 'mongodb://localhost:27017/habits-test' }}
-
-      - name: Run test coverage
-        if: github.event_name == 'pull_request'
-        run: npm run test:coverage
-        env:
-          JWT_SECRET: ${{ secrets.JWT_SECRET || 'test-jwt-secret' }}
-          MONGODB_URI: ${{ secrets.MONGODB_URI || 'mongodb://localhost:27017/test-db' }}
-
-      - name: Upload coverage reports
-        if: github.event_name == 'pull_request'
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report
-          path: coverage/
+  ci-process:
+    uses: ./.github/workflows/reusable.yml
+    with:
+      run-tests: true
+      run-build: true
+      run-docker: false
+    secrets:
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      MONGODB_URI: ${{ secrets.MONGODB_URI }}

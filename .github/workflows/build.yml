@@ -5,72 +5,18 @@ on:
     branches:
       - main # Production build
       - staging # Staging build
+  workflow_dispatch:
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Use Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "npm"
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run linting
-        run: npm run lint || true # Allow linting to fail without stopping workflow
-
-      - name: Run type check
-        run: npm run typecheck
-
-      - name: Run tests
-        run: npm test
-        env:
-          JWT_SECRET: ${{ secrets.JWT_SECRET || 'test-jwt-secret' }}
-          MONGODB_URI: ${{ secrets.MONGODB_URI || 'mongodb://localhost:27017/test-db' }}
-
-      - name: Build
-        run: npm run build
-
-      # Extract version info for tagging
-      - name: Get version info
-        id: version
-        run: |
-          echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-          echo "date=$(date +'%Y%m%d')" >> $GITHUB_OUTPUT
-
-      # Set environment-specific variables
-      - name: Set environment variables
-        id: env
-        run: |
-          if [[ ${{ github.ref }} == 'refs/heads/main' ]]; then
-            echo "ENV_TAG=latest" >> $GITHUB_OUTPUT
-          else
-            echo "ENV_TAG=staging" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: |
-            ${{ secrets.DOCKER_USERNAME }}/habits-api:${{ steps.env.outputs.ENV_TAG }}
-            ${{ secrets.DOCKER_USERNAME }}/habits-api:${{ steps.version.outputs.sha_short }}
-            ${{ secrets.DOCKER_USERNAME }}/habits-api:${{ steps.version.outputs.date }}-${{ steps.env.outputs.ENV_TAG }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+  build-deploy:
+    uses: ./.github/workflows/reusable.yml
+    with:
+      run-tests: true
+      run-build: true
+      run-docker: true
+      environment-tag: ${{ github.ref == 'refs/heads/main' && 'latest' || 'staging' }}
+    secrets:
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      MONGODB_URI: ${{ secrets.MONGODB_URI }}
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}

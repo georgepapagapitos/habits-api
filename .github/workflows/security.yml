@@ -1,12 +1,13 @@
-name: API Security Scanning
+name: Security Scanning
 
 on:
   push:
-    branches: [main]
+    branches: [main, staging]
   pull_request:
-    branches: [main]
+    branches: [main, staging]
   schedule:
     - cron: "0 0 * * 0" # Run weekly on Sundays
+  workflow_dispatch:
 
 jobs:
   dependency-review:
@@ -23,7 +24,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       security-events: write
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
