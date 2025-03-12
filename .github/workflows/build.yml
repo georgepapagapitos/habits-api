@@ -2,7 +2,9 @@ name: API Build and Deploy
 
 on:
   push:
-    branches: [main] # Only run on main branch pushes
+    branches:
+      - main # Production build
+      - staging # Staging build
 
 jobs:
   build:
@@ -42,6 +44,16 @@ jobs:
           echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
           echo "date=$(date +'%Y%m%d')" >> $GITHUB_OUTPUT
 
+      # Set environment-specific variables
+      - name: Set environment variables
+        id: env
+        run: |
+          if [[ ${{ github.ref }} == 'refs/heads/main' ]]; then
+            echo "ENV_TAG=latest" >> $GITHUB_OUTPUT
+          else
+            echo "ENV_TAG=staging" >> $GITHUB_OUTPUT
+          fi
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -57,8 +69,8 @@ jobs:
           context: .
           push: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/habits-api:latest
+            ${{ secrets.DOCKER_USERNAME }}/habits-api:${{ steps.env.outputs.ENV_TAG }}
             ${{ secrets.DOCKER_USERNAME }}/habits-api:${{ steps.version.outputs.sha_short }}
-            ${{ secrets.DOCKER_USERNAME }}/habits-api:${{ steps.version.outputs.date }}
+            ${{ secrets.DOCKER_USERNAME }}/habits-api:${{ steps.version.outputs.date }}-${{ steps.env.outputs.ENV_TAG }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
