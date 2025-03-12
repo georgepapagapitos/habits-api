@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { photoController } from "../controllers/photo.controller";
 import * as googlePhotosService from "../services/google-photos.service";
+import axios from "axios";
 
 // Mock the Google Photos service
 jest.mock("../services/google-photos.service", () => ({
@@ -8,7 +9,11 @@ jest.mock("../services/google-photos.service", () => ({
   getAuthUrl: jest.fn(),
   handleOAuth2Callback: jest.fn(),
   listAlbums: jest.fn(),
+  getPhotoById: jest.fn(),
 }));
+
+// Mock axios
+jest.mock("axios");
 
 describe("Photo Controller", () => {
   let mockRequest: Partial<Request>;
@@ -26,6 +31,8 @@ describe("Photo Controller", () => {
     mockResponse = {
       status: jest.fn().mockReturnThis(),
       json: jest.fn().mockReturnThis(),
+      set: jest.fn().mockReturnThis(),
+      send: jest.fn().mockReturnThis(),
     };
   });
 
@@ -300,6 +307,308 @@ describe("Photo Controller", () => {
         message: "Error handling OAuth callback",
         error: "Service error",
       });
+    });
+  });
+
+  describe("proxyPhoto", () => {
+    test("should successfully proxy a photo from Google Photos", async () => {
+      // Setup mock request with params
+      mockRequest.params = {
+        photoId: "photo123",
+        width: "400",
+        height: "400",
+      };
+
+      // Mock process.env
+      process.env.APP_URL = "http://localhost:5050";
+      process.env.GOOGLE_ACCESS_TOKEN = "test-token";
+      process.env.GOOGLE_REFRESH_TOKEN = "test-refresh-token";
+
+      // Mock the Google Photos service to return a photo object
+      const mockPhoto = {
+        id: "photo123",
+        baseUrl: "https://example.com/photo123",
+        mediaMetadata: {
+          width: "800",
+          height: "600",
+        },
+      };
+      (googlePhotosService.getPhotoById as jest.Mock).mockResolvedValue(
+        mockPhoto
+      );
+
+      // Mock axios to return an image response
+      const mockImageResponse = {
+        headers: {
+          "content-type": "image/jpeg",
+        },
+        data: Buffer.from("fake-image-data"),
+      };
+      (axios.get as jest.Mock).mockResolvedValue(mockImageResponse);
+
+      // Call the controller
+      await photoController.proxyPhoto(
+        mockRequest as Request,
+        mockResponse as Response
+      );
+
+      // Verify Google Photos service was called with the photo ID
+      expect(googlePhotosService.getPhotoById).toHaveBeenCalledWith("photo123");
+
+      // Verify response headers and body
+      expect(mockResponse.set).toHaveBeenCalledWith(
+        "Content-Type",
+        "image/jpeg"
+      );
+      expect(mockResponse.set).toHaveBeenCalledWith(
+        "Cache-Control",
+        "public, max-age=86400"
+      );
+      expect(mockResponse.set).toHaveBeenCalledWith(
+        "Access-Control-Allow-Origin",
+        "*"
+      );
+      expect(mockResponse.send).toHaveBeenCalledWith(
+        Buffer.from("fake-image-data")
+      );
+    });
+
+    test("should return 404 if photo not found", async () => {
+      // Setup mock request with params
+      mockRequest.params = {
+        photoId: "nonexistent",
+        width: "400",
+        height: "400",
+      };
+
+      // Mock the Google Photos service to return null (photo not found)
+      (googlePhotosService.getPhotoById as jest.Mock).mockResolvedValue(null);
+
+      // Call the controller
+      await photoController.proxyPhoto(
+        mockRequest as Request,
+        mockResponse as Response
+      );
+
+      // Verify response
+      expect(mockResponse.status).toHaveBeenCalledWith(404);
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        message: "Photo not found",
+      });
+    });
+
+    test("should handle axios error with response", async () => {
+      // Setup mock request with params
+      mockRequest.params = {
+        photoId: "photo123",
+        width: "400",
+        height: "400",
+      };
+
+      // Mock process.env
+      process.env.GOOGLE_ACCESS_TOKEN = "test-token";
+      process.env.GOOGLE_REFRESH_TOKEN = "test-refresh-token";
+
+      // Mock the Google Photos service to return a photo object
+      const mockPhoto = {
+        id: "photo123",
+        baseUrl: "https://example.com/photo123",
+        mediaMetadata: {
+          width: "800",
+          height: "600",
+        },
+      };
+      (googlePhotosService.getPhotoById as jest.Mock).mockResolvedValue(
+        mockPhoto
+      );
+
+      // Mock axios to throw an error with response
+      const axiosError = {
+        message: "Request failed",
+        response: {
+          status: 403,
+        },
+      };
+      (axios.get as jest.Mock).mockRejectedValue(axiosError);
+
+      // Call the controller
+      await photoController.proxyPhoto(
+        mockRequest as Request,
+        mockResponse as Response
+      );
+
+      // Verify response
+      expect(mockResponse.status).toHaveBeenCalledWith(403);
+      expect(mockResponse.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: expect.any(String),
+        })
+      );
+    });
+
+    test("should handle axios error with request but no response", async () => {
+      // Setup mock request with params
+      mockRequest.params = {
+        photoId: "photo123",
+        width: "400",
+        height: "400",
+      };
+
+      // Mock process.env
+      process.env.GOOGLE_ACCESS_TOKEN = "test-token";
+      process.env.GOOGLE_REFRESH_TOKEN = "test-refresh-token";
+
+      // Mock the Google Photos service to return a photo object
+      const mockPhoto = {
+        id: "photo123",
+        baseUrl: "https://example.com/photo123",
+        mediaMetadata: {
+          width: "800",
+          height: "600",
+        },
+      };
+      (googlePhotosService.getPhotoById as jest.Mock).mockResolvedValue(
+        mockPhoto
+      );
+
+      // Mock axios to throw an error with request but no response
+      const axiosError = {
+        message: "Request timeout",
+        request: {},
+      };
+      (axios.get as jest.Mock).mockRejectedValue(axiosError);
+
+      // Call the controller
+      await photoController.proxyPhoto(
+        mockRequest as Request,
+        mockResponse as Response
+      );
+
+      // Verify response
+      expect(mockResponse.status).toHaveBeenCalledWith(504);
+      expect(mockResponse.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: expect.any(String),
+        })
+      );
+    });
+
+    test("should handle generic axios error", async () => {
+      // Setup mock request with params
+      mockRequest.params = {
+        photoId: "photo123",
+        width: "400",
+        height: "400",
+      };
+
+      // Mock process.env
+      process.env.GOOGLE_ACCESS_TOKEN = "test-token";
+      process.env.GOOGLE_REFRESH_TOKEN = "test-refresh-token";
+
+      // Mock the Google Photos service to return a photo object
+      const mockPhoto = {
+        id: "photo123",
+        baseUrl: "https://example.com/photo123",
+        mediaMetadata: {
+          width: "800",
+          height: "600",
+        },
+      };
+      (googlePhotosService.getPhotoById as jest.Mock).mockResolvedValue(
+        mockPhoto
+      );
+
+      // Mock axios to throw a generic error
+      const axiosError = new Error("Network error");
+      (axios.get as jest.Mock).mockRejectedValue(axiosError);
+
+      // Call the controller
+      await photoController.proxyPhoto(
+        mockRequest as Request,
+        mockResponse as Response
+      );
+
+      // Verify response
+      expect(mockResponse.status).toHaveBeenCalledWith(502);
+      expect(mockResponse.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: expect.any(String),
+        })
+      );
+    });
+
+    test("should handle error in getPhotoById", async () => {
+      // Setup mock request with params
+      mockRequest.params = {
+        photoId: "photo123",
+        width: "400",
+        height: "400",
+      };
+
+      // Mock the Google Photos service to throw an error
+      (googlePhotosService.getPhotoById as jest.Mock).mockRejectedValue(
+        new Error("Service error")
+      );
+
+      // Call the controller
+      await photoController.proxyPhoto(
+        mockRequest as Request,
+        mockResponse as Response
+      );
+
+      // Verify response
+      expect(mockResponse.status).toHaveBeenCalledWith(500);
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        message: "Internal server error",
+      });
+    });
+
+    test("should use default width and height if not provided", async () => {
+      // Setup mock request with only photoId
+      mockRequest.params = {
+        photoId: "photo123",
+      };
+
+      // Mock process.env
+      process.env.GOOGLE_ACCESS_TOKEN = "test-token";
+      process.env.GOOGLE_REFRESH_TOKEN = "test-refresh-token";
+
+      // Mock the Google Photos service to return a photo object
+      const mockPhoto = {
+        id: "photo123",
+        baseUrl: "https://example.com/photo123",
+        mediaMetadata: {
+          width: "800",
+          height: "600",
+        },
+      };
+      (googlePhotosService.getPhotoById as jest.Mock).mockResolvedValue(
+        mockPhoto
+      );
+
+      // Mock axios to return an image response
+      const mockImageResponse = {
+        headers: {
+          "content-type": "image/jpeg",
+        },
+        data: Buffer.from("fake-image-data"),
+      };
+      (axios.get as jest.Mock).mockResolvedValue(mockImageResponse);
+
+      // Call the controller
+      await photoController.proxyPhoto(
+        mockRequest as Request,
+        mockResponse as Response
+      );
+
+      // Verify response was returned properly
+      expect(mockResponse.set).toHaveBeenCalledWith(
+        "Content-Type",
+        "image/jpeg"
+      );
+      expect(mockResponse.send).toHaveBeenCalledWith(
+        Buffer.from("fake-image-data")
+      );
     });
   });
 });
