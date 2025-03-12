@@ -51,6 +51,7 @@ import {
   getAuthUrl,
   handleOAuth2Callback,
   listAlbums,
+  getPhotoById,
 } from "../services/google-photos.service";
 
 // Mock environment variables
@@ -388,6 +389,106 @@ describe("Google Photos Service", () => {
 
       // Restore console.error
       consoleErrorSpy.mockRestore();
+    });
+  });
+
+  describe("getPhotoById", () => {
+    beforeEach(() => {
+      // Reset all mocks
+      jest.clearAllMocks();
+
+      // Set environment variables for each test
+      process.env.GOOGLE_ACCESS_TOKEN = TEST_ACCESS_TOKEN;
+      process.env.GOOGLE_REFRESH_TOKEN = TEST_REFRESH_TOKEN;
+      process.env.GOOGLE_TOKEN_EXPIRY = TEST_EXPIRY_DATE.toString();
+    });
+
+    afterEach(() => {
+      // Reset environment variables after each test
+      process.env = { ...originalEnv };
+    });
+
+    test("should return a photo by ID", async () => {
+      // Mock the API response
+      const mockPhoto = {
+        id: "photo123",
+        baseUrl: "https://example.com/photo.jpg",
+        productUrl: "https://photos.google.com/photo/123",
+        mimeType: "image/jpeg",
+        mediaMetadata: {
+          creationTime: "2023-01-01T00:00:00Z",
+          width: "800",
+          height: "600",
+        },
+        filename: "photo.jpg",
+      };
+
+      // Mock axios to return the photo
+      (axios.get as jest.Mock).mockResolvedValueOnce({
+        data: mockPhoto,
+      });
+
+      // Call the service
+      const result = await getPhotoById("photo123");
+
+      // Verify axios was called with correct parameters
+      expect(axios.get).toHaveBeenCalledWith(
+        "https://photoslibrary.googleapis.com/v1/mediaItems/photo123",
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Authorization: `Bearer ${TEST_ACCESS_TOKEN}`,
+          }),
+        })
+      );
+
+      // Verify result
+      expect(result).toEqual(mockPhoto);
+    });
+
+    test("should return null if credentials are not available", async () => {
+      // Remove environment variables
+      delete process.env.GOOGLE_ACCESS_TOKEN;
+      delete process.env.GOOGLE_REFRESH_TOKEN;
+
+      // Mock console.error to prevent test output noise
+      const consoleErrorSpy = jest
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+
+      try {
+        // Call the service
+        const result = await getPhotoById("photo123");
+
+        // Verify axios was not called
+        expect(axios.get).not.toHaveBeenCalled();
+
+        // Verify result is null
+        expect(result).toBeNull();
+      } finally {
+        consoleErrorSpy.mockRestore();
+      }
+    });
+
+    test("should return null if an error occurs", async () => {
+      // Mock axios to throw an error
+      (axios.get as jest.Mock).mockRejectedValueOnce(
+        new Error("Service unavailable")
+      );
+
+      // Mock console.error to prevent test output noise
+      const consoleErrorSpy = jest
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+
+      try {
+        // Call the service
+        const result = await getPhotoById("photo123");
+
+        // Verify result is null
+        expect(result).toBeNull();
+      } finally {
+        consoleErrorSpy.mockRestore();
+      }
     });
   });
 });
