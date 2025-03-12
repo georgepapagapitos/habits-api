@@ -1,0 +1,112 @@
+name: Reusable API Workflow
+
+on:
+  workflow_call:
+    inputs:
+      run-tests:
+        required: false
+        type: boolean
+        default: true
+      run-build:
+        required: false
+        type: boolean
+        default: true
+      run-docker:
+        required: false
+        type: boolean
+        default: false
+      environment-tag:
+        required: false
+        type: string
+        default: ""
+    secrets:
+      JWT_SECRET:
+        required: false
+      MONGODB_URI:
+        required: false
+      DOCKER_USERNAME:
+        required: false
+      DOCKER_PASSWORD:
+        required: false
+
+jobs:
+  standard-process:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linting
+        run: npm run lint || true # Allow linting to fail without stopping workflow
+
+      - name: Run type check
+        run: npm run typecheck
+
+      # Conditionally run tests
+      - name: Run tests
+        if: inputs.run-tests
+        run: npm test
+        env:
+          JWT_SECRET: ${{ secrets.JWT_SECRET || 'test-jwt-secret' }}
+          MONGODB_URI: ${{ secrets.MONGODB_URI || 'mongodb://localhost:27017/test-db' }}
+
+      # Conditionally run test coverage on PRs
+      - name: Run test coverage
+        if: inputs.run-tests && github.event_name == 'pull_request'
+        run: npm run test:coverage
+        env:
+          JWT_SECRET: ${{ secrets.JWT_SECRET || 'test-jwt-secret' }}
+          MONGODB_URI: ${{ secrets.MONGODB_URI || 'mongodb://localhost:27017/test-db' }}
+
+      # Upload coverage reports on PRs
+      - name: Upload coverage reports
+        if: inputs.run-tests && github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-coverage-report
+          path: coverage/
+
+      # Conditionally build
+      - name: Build
+        if: inputs.run-build
+        run: npm run build
+
+      # Conditionally build and push Docker image
+      - name: Extract version info for tagging
+        if: inputs.run-docker
+        id: version
+        run: |
+          echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "date=$(date +'%Y%m%d')" >> $GITHUB_OUTPUT
+
+      - name: Set up Docker Buildx
+        if: inputs.run-docker
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        if: inputs.run-docker
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push Docker image
+        if: inputs.run-docker && inputs.environment-tag != ''
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/habits-api:${{ inputs.environment-tag }}
+            ${{ secrets.DOCKER_USERNAME }}/habits-api:${{ steps.version.outputs.sha_short }}
+            ${{ secrets.DOCKER_USERNAME }}/habits-api:${{ steps.version.outputs.date }}-${{ inputs.environment-tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
