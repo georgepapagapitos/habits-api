@@ -14,15 +14,25 @@ export const photoController = {
   proxyPhoto: async (req: Request, res: Response): Promise<void> => {
     try {
       const { photoId, width, height } = req.params;
+      // Sanitize inputs for logging
+      const sanitizedPhotoId = photoId.replace(/[^\w-]/g, "");
+      const sanitizedWidth = width ? width.replace(/\D/g, "") : "default";
+      const sanitizedHeight = height ? height.replace(/\D/g, "") : "default";
       console.log(
-        `Proxying photo ${photoId} with dimensions ${width}x${height}`
+        "Proxying photo " +
+          sanitizedPhotoId +
+          " with dimensions " +
+          sanitizedWidth +
+          "x" +
+          sanitizedHeight
       );
 
       // Get photo details from Google Photos API
       const photo = await getPhotoById(photoId);
 
       if (!photo) {
-        console.error(`Photo not found: ${photoId}`);
+        // Use sanitized ID for logging
+        console.error("Photo not found: " + sanitizedPhotoId);
         res.status(404).json({ message: "Photo not found" });
         return;
       }
@@ -72,7 +82,7 @@ export const photoController = {
 
         // Send the image data
         res.send(Buffer.from(imageResponse.data));
-        console.log(`Successfully proxied photo ${photoId}`);
+        console.log("Successfully proxied photo " + sanitizedPhotoId);
       } catch (fetchError: unknown) {
         // Type check the error
         const axiosError = fetchError as {
@@ -81,17 +91,18 @@ export const photoController = {
           request?: unknown;
         };
 
+        // Sanitize the photo ID to prevent injection in logs
+        const sanitizedPhotoId = photoId.replace(/[^\w-]/g, "");
         console.error(
-          `Error proxying photo ${photoId}:`,
+          "Error proxying photo " + sanitizedPhotoId + ":",
           axiosError.message || "Unknown error"
         );
 
         // Provide different error responses based on error type
         if (axiosError.response) {
           // The request was made and the server responded with a non-2xx status
-          console.error(
-            `Google Photos returned status ${axiosError.response.status}`
-          );
+          const status = axiosError.response?.status || 0;
+          console.error("Google Photos returned status " + status);
           res.status(axiosError.response.status).json({
             message: "Google Photos returned an error",
             status: axiosError.response.status,

@@ -201,6 +201,17 @@ export const getPhotoById = async (
   photoId: string
 ): Promise<GooglePhoto | null> => {
   try {
+    // Input validation to prevent SSRF
+    // Only allow alphanumeric characters, hyphens, and underscores in photo IDs
+    if (
+      !photoId ||
+      typeof photoId !== "string" ||
+      !/^[a-zA-Z0-9\-_]+$/.test(photoId)
+    ) {
+      console.error("Invalid photo ID format");
+      return null;
+    }
+
     // Ensure credentials are set
     if (!setCredentialsFromEnv()) {
       throw new Error("Google credentials not available");
@@ -210,16 +221,18 @@ export const getPhotoById = async (
     const token = await oauth2Client.getAccessToken();
     const accessToken = token.token;
 
+    // Use a fixed base URL and path joining with encodeURIComponent to prevent SSRF
+    const baseUrl = "https://photoslibrary.googleapis.com";
+    const path = "/v1/mediaItems/" + encodeURIComponent(photoId);
+    const fullUrl = baseUrl + path;
+
     // Use axios to make the request directly to Google Photos API
-    const response = await axios.get(
-      `https://photoslibrary.googleapis.com/v1/mediaItems/${photoId}`,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
+    const response = await axios.get(fullUrl, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    });
 
     return response.data;
   } catch (error) {
@@ -277,8 +290,14 @@ export const getRandomPhoto = async (
       if (previousDayPhotos.has(habitKey)) {
         const prevRecord = previousDayPhotos.get(habitKey);
         previousIndex = prevRecord?.photoIndex;
+        // Safe string concatenation for logging
         console.log(
-          `Previous day photo index for ${habitKey}: ${previousIndex} from ${prevRecord?.date}`
+          "Previous day photo index for " +
+            habitKey +
+            ": " +
+            (previousIndex !== undefined ? previousIndex : "undefined") +
+            " from " +
+            (prevRecord?.date || "unknown date")
         );
       }
 
@@ -296,8 +315,14 @@ export const getRandomPhoto = async (
             Math.floor(Math.random() * (mediaItems.length / 2))
           );
           photoIndex = (baseIndex + offset) % mediaItems.length;
+          // Safe string concatenation for logging
           console.log(
-            `Avoiding repeat photo. Shifted from ${baseIndex} to ${photoIndex} with offset ${offset}`
+            "Avoiding repeat photo. Shifted from " +
+              baseIndex +
+              " to " +
+              photoIndex +
+              " with offset " +
+              offset
           );
         } else {
           photoIndex = baseIndex;
@@ -312,8 +337,14 @@ export const getRandomPhoto = async (
         photoIndex,
         date: dateString,
       });
+      // Safe string concatenation for logging
       console.log(
-        `Set photo index ${photoIndex} for ${habitKey} on ${dateString}`
+        "Set photo index " +
+          photoIndex +
+          " for " +
+          habitKey +
+          " on " +
+          dateString
       );
     } else {
       // For truly random selection (no seed), just pick any random photo
