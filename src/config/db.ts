@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
-import { MONGODB_URI } from "./env";
 import { logger } from "../utils/logger";
+import { MONGODB_URI } from "./env";
 
 // Suppress strictQuery warning
 mongoose.set("strictQuery", false);

@@ -52,15 +52,26 @@ const photoCache: Map<number, CachedPhoto> = new Map();
 const PHOTO_CACHE_TTL = 24 * 60 * 60 * 1000;
 
 // A map to track previous day's photo indexes for each habit (by seed base)
-// Format: { habitKey -> { photoIndex, date } }
+// Format: { habitKey -> { photoIndex, date, previousPhotoIndexes } }
 interface PreviousPhotoRecord {
   photoIndex: number;
   date: string; // YYYY-MM-DD format
+  // Track the last 7 photo indexes used to better avoid repeats
+  previousPhotoIndexes?: number[];
 }
 
 const previousDayPhotos: Map<string, PreviousPhotoRecord> = new Map();
 
-// Function to check and clean up outdated photo records
+/**
+ * Checks and cleans up outdated photo records.
+ * This function is crucial for ensuring users get new photos every day.
+ * It:
+ * 1. Detects records from previous days
+ * 2. Removes outdated records so they don't influence today's selections
+ * 3. Clears the photo cache when the date changes
+ *
+ * This is the main function that ensures different photos each day.
+ */
 const cleanupOldPhotoRecords = (): void => {
   const today = new Date();
   const todayString = `${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate()}`;
@@ -70,7 +81,7 @@ const cleanupOldPhotoRecords = (): void => {
 
   console.log(`Checking for old photo records. Today is ${todayString}`);
 
-  // Keep track of records to remove from other days
+  // Keep track of records to update from other days
   const recordsToUpdate: Array<{ key: string; record: PreviousPhotoRecord }> =
     [];
 
@@ -87,16 +98,19 @@ const cleanupOldPhotoRecords = (): void => {
       `Found ${recordsToUpdate.length} photo records from previous days`
     );
 
+    // Clear all outdated records - we'll let them be regenerated with new indexes
+    // instead of reusing the same photo indexes day after day
     for (const { key, record } of recordsToUpdate) {
-      // Move the record to the actual previousDay tracking
       console.log(
-        `Updating record for ${key}: ${record.photoIndex} from ${record.date} -> ${todayString}`
+        `Removing outdated record for ${key}: ${record.photoIndex} from ${record.date}. Will get a new photo for today.`
       );
-      previousDayPhotos.set(key, {
-        photoIndex: record.photoIndex,
-        date: todayString,
-      });
+      // Remove old records instead of updating them with the same photoIndex
+      previousDayPhotos.delete(key);
     }
+
+    // Clear the photo cache when we detect a date change to ensure fresh photos
+    console.log("Clearing photo cache due to date change");
+    photoCache.clear();
   }
 };
 
@@ -241,8 +255,21 @@ export const getPhotoById = async (
   }
 };
 
-// Get a random photo from the album with improved caching
-// If seed is provided, use it for deterministic selection
+// Get a random photo from the album with improved caching and consistent selection
+/**
+ * Returns a photo from the album, either randomly or deterministically based on seed
+ *
+ * Seed format expected from the UI:
+ * - habit part: habitHash * 1,000,000 (scaled to millions)
+ * - date part: YYYYMMDD as integer (smaller component)
+ * - seed is the sum of these two components
+ *
+ * This allows us to:
+ * 1. Extract the habit ID portion by dividing by 1,000,000
+ * 2. Ensure the same habit gets the same photo on a given day
+ * 3. Ensure different habits get different photos
+ * 4. Ensure the same habit gets different photos on different days
+ */
 export const getRandomPhoto = async (
   seed?: number
 ): Promise<PhotoResponse | null> => {
@@ -275,13 +302,15 @@ export const getRandomPhoto = async (
     if (seed !== undefined) {
       // First, extract the habit ID portion from the seed
       // The seed is typically a hash combining habit ID and date
-      // We need to identify which habit this is for tracking previous photos
+      // The UI sends a seed where habit part is multiplied by 1,000,000
       const currentDate = new Date();
       const dateString = `${currentDate.getFullYear()}-${currentDate.getMonth() + 1}-${currentDate.getDate()}`;
 
-      // Create a unique key for this habit by removing the date component
-      // This is based on how the seed is generated on the client (habit ID + date hash)
-      const habitKey = `habit-${Math.floor(seed / 1000000)}`; // Simplified extraction
+      // Create a unique key for this habit
+      // Extract just the habit portion of the seed (removing date component)
+      // This matches how the UI generates the seed
+      const habitIDPortion = Math.floor(seed / 1000000);
+      const habitKey = `habit-${habitIDPortion}`;
 
       // Run cleanup to check for date changes
       cleanupOldPhotoRecords();
@@ -302,49 +331,108 @@ export const getRandomPhoto = async (
       }
 
       // Generate a deterministic index for today based on seed
+      // We need to ensure that:
+      // 1. Different habits get DIFFERENT photos on the same day
+      // 2. The same habit gets different photos on different days
+      // 3. The same habit+day combo always gets the same photo
+
+      // Extract the date component - already in the seed from the UI
+      // Just ensure the habit ID part is used properly for randomization
       const baseIndex = Math.abs(seed) % mediaItems.length;
 
-      // If we have a previous index and there are enough photos, ensure we pick a different one
-      if (previousIndex !== undefined && mediaItems.length > 1) {
-        // If the deterministic index would give the same photo as yesterday, shift it
-        if (baseIndex === previousIndex) {
-          // Pick a completely different photo instead of just the next one
-          // Create a random offset between 1 and half the collection size
-          const offset = Math.max(
-            1,
-            Math.floor(Math.random() * (mediaItems.length / 2))
-          );
-          photoIndex = (baseIndex + offset) % mediaItems.length;
-          // Safe string concatenation for logging
+      // Add more variation using the habit ID portion to make sure different habits
+      // have different base indexes even on the same date
+      const variationFactor = Math.pow((habitIDPortion % 10) + 1, 2); // Square to increase differences
+      const habitVariedIndex =
+        (baseIndex * variationFactor) % mediaItems.length;
+
+      console.log(
+        `Using base index: ${baseIndex}, with habit variation: ${habitVariedIndex} (habit ID: ${habitIDPortion}, factor: ${variationFactor})`
+      );
+
+      // Get the existing previous photo indexes to avoid repeats
+      const existingRecord = previousDayPhotos.get(habitKey);
+      const previousPhotoIndexes = existingRecord?.previousPhotoIndexes || [];
+
+      // Use the habit-varied index as our starting point
+      photoIndex = habitVariedIndex;
+
+      // If we have previous photos and enough media items, ensure we pick a different one
+      if (previousPhotoIndexes.length > 0 && mediaItems.length > 1) {
+        // Check if our calculated index is in the list of recently used photos
+        if (
+          previousPhotoIndexes.includes(photoIndex) ||
+          photoIndex === previousIndex
+        ) {
           console.log(
-            "Avoiding repeat photo. Shifted from " +
-              baseIndex +
-              " to " +
-              photoIndex +
-              " with offset " +
-              offset
+            `Calculated index ${photoIndex} has been used recently. Finding alternative...`
           );
+
+          // Create an array of all possible indexes except ones we've used recently
+          const usedIndexes = new Set([...previousPhotoIndexes]);
+          if (previousIndex !== undefined) usedIndexes.add(previousIndex);
+
+          const availableIndexes = Array.from(
+            { length: mediaItems.length },
+            (_, i) => i
+          ).filter((idx) => !usedIndexes.has(idx));
+
+          // If we have available indexes that haven't been used recently, choose one
+          if (availableIndexes.length > 0) {
+            // Use a deterministic method to select from available indexes
+            // Using seed and habitVariedIndex to maintain determinism
+            const secondaryHash =
+              (seed * 31 + habitVariedIndex) % availableIndexes.length;
+            photoIndex = availableIndexes[secondaryHash];
+
+            console.log(
+              `Avoiding repeat photo. Selected new index ${photoIndex} from ${availableIndexes.length} available options`
+            );
+          } else {
+            // If all photos have been used recently, pick one that wasn't used most recently
+            // Sort previousPhotoIndexes by recency (most recent first)
+            // and pick the least recently used one
+            const leastRecentlyUsed = [...previousPhotoIndexes].pop(); // Last element = least recent
+            photoIndex = (leastRecentlyUsed! + 1) % mediaItems.length; // Use next index after least recent
+
+            console.log(
+              `All photos have been used recently. Using least recently used + 1: ${photoIndex}`
+            );
+          }
         } else {
-          photoIndex = baseIndex;
+          console.log(
+            `Using calculated index: ${photoIndex} (not in recently used list)`
+          );
         }
       } else {
-        photoIndex = baseIndex;
+        console.log(
+          `Using base index: ${photoIndex} (no previous indexes available)`
+        );
       }
 
-      // Store this photo index for tomorrow's reference
+      // If we have a previous index, add it to the history (if not already there)
+      if (
+        previousIndex !== undefined &&
+        !previousPhotoIndexes.includes(previousIndex)
+      ) {
+        previousPhotoIndexes.unshift(previousIndex);
+
+        // Limit the history to last 7 days
+        if (previousPhotoIndexes.length > 7) {
+          previousPhotoIndexes.pop();
+        }
+      }
+
+      // Store this photo index for tomorrow's reference with history
       // We store it with today's date so we know when to update it
       previousDayPhotos.set(habitKey, {
         photoIndex,
         date: dateString,
+        previousPhotoIndexes,
       });
-      // Safe string concatenation for logging
+
       console.log(
-        "Set photo index " +
-          photoIndex +
-          " for " +
-          habitKey +
-          " on " +
-          dateString
+        `Stored photo index ${photoIndex} for ${habitKey} on ${dateString} with history: [${previousPhotoIndexes.join(", ")}]`
       );
     } else {
       // For truly random selection (no seed), just pick any random photo
