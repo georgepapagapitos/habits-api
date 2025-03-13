@@ -1,4 +1,4 @@
-name: Sync Main to Staging
+name: Create Staging PR from Main
 
 on:
   push:
@@ -6,10 +6,11 @@ on:
   workflow_dispatch:
 
 jobs:
-  sync-to-staging:
+  create-pr-to-staging:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@v3
         with:
@@ -21,14 +22,18 @@ jobs:
           git config user.name "GitHub Actions"
           git config user.email "github-actions@github.com"
 
-      - name: Merge Main into Staging
+      - name: Create PR from Main to Staging if needed
         run: |
           # Check if there are differences between main and staging
           if git diff --quiet origin/main origin/staging; then
-            echo "No differences between main and staging, skipping sync"
+            echo "No differences between main and staging, skipping PR creation"
             exit 0
           fi
 
-          git checkout staging
-          git merge origin/main -m "chore: sync main to staging [skip ci]"
-          git push origin staging
+          # Create PR using GitHub CLI
+          gh pr create --base staging --head main \
+            --title "Sync: Update Staging with Main Changes" \
+            --body "This is an automated PR to update staging with changes that have been merged to main." \
+            || echo "PR already exists or could not be created"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
