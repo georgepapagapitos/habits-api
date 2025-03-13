@@ -2,9 +2,9 @@ name: API CI
 
 on:
   push:
-    branches-ignore: [main, staging] # Run on all branches except main and staging
+    branches-ignore: [main] # Run on all branches except main
   pull_request:
-    branches: [main, staging] # Run on PRs targeting main or staging
+    branches: [main] # Run on PRs targeting main
 
 jobs:
   ci-process:

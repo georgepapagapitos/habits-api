@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main # Production build
-      - staging # Staging build
   workflow_dispatch:
 
 jobs:
@@ -14,7 +13,7 @@ jobs:
       run-tests: true
       run-build: true
       run-docker: true
-      environment-tag: ${{ github.ref == 'refs/heads/main' && 'latest' || 'staging' }}
+      environment-tag: "latest"
     secrets:
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
       MONGODB_URI: ${{ secrets.MONGODB_URI }}
