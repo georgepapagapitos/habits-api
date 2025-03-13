@@ -1,0 +1,32 @@
+name: Sync Staging with Main
+
+on:
+  workflow_run:
+    workflows: ["API Build and Deploy"]
+    branches: [main]
+    types:
+      - completed
+  workflow_dispatch:
+
+jobs:
+  sync-staging:
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "github-actions@github.com"
+
+      - name: Merge Main into Staging
+        run: |
+          git checkout staging
+          git merge origin/main -m "chore: sync staging with main [skip ci]"
+          git push origin staging
