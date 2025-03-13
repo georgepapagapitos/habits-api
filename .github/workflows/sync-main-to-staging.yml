@@ -1,0 +1,34 @@
+name: Sync Main to Staging
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  sync-to-staging:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "github-actions@github.com"
+
+      - name: Merge Main into Staging
+        run: |
+          # Check if there are differences between main and staging
+          if git diff --quiet origin/main origin/staging; then
+            echo "No differences between main and staging, skipping sync"
+            exit 0
+          fi
+
+          git checkout staging
+          git merge origin/main -m "chore: sync main to staging [skip ci]"
+          git push origin staging
