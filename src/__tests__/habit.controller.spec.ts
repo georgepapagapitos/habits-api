@@ -387,7 +387,8 @@ describe("Habit Controller", () => {
       expect(mockResponse.status).toHaveBeenCalledWith(200);
 
       // Check the response structure
-      const responseData = mockResponse.json.mock.calls[0][0];
+      // Add type assertion to handle the mock function properties
+      const responseData = (mockResponse.json as jest.Mock).mock.calls[0][0];
       expect(responseData.success).toBe(true);
       expect(responseData.data).toHaveProperty("totalHabits", 2);
       expect(responseData.data).toHaveProperty("longestStreak");
