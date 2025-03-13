@@ -1,15 +1,85 @@
+import axios from "axios";
 import { Request, Response } from "express";
 import {
-  getRandomPhoto,
   getAuthUrl,
+  getPhotoById,
+  getRandomPhoto,
   handleOAuth2Callback,
   listAlbums,
-  getPhotoById,
 } from "../services/google-photos.service";
-import axios from "axios";
 
 // Create a controller object following the same pattern as habitController
 export const photoController = {
+  // Test endpoint to verify daily photo rotation
+  testDailyRotation: async (req: Request, res: Response): Promise<void> => {
+    try {
+      // Extract habit ID and number of days to simulate
+      const { habitId = "test-habit", days = 7 } = req.query;
+      const today = new Date();
+
+      // Validate and limit days to prevent excessive computation
+      const daysToSimulate = Math.min(
+        Math.max(1, Number(days) || 7), // Default to 7 if NaN, minimum 1
+        30 // Cap at 30 days for safety
+      );
+
+      // Generate results for each day
+      const results = [];
+
+      for (let i = 0; i < daysToSimulate; i++) {
+        // Create a date for each day
+        const testDate = new Date(today);
+        testDate.setDate(today.getDate() + i);
+        const dateString = testDate.toISOString().split("T")[0];
+        const dateNumber = parseInt(dateString.replace(/-/g, ""));
+
+        // Generate a consistent habit hash (same as the UI would)
+        let habitHash = 0;
+        // Limit and sanitize habitId to prevent loop bound injection
+        const habitIdStr = String(habitId)
+          .replace(/[^\w-]/g, "")
+          .substring(0, 100);
+        // Safety check: set a reasonable max length for the loop
+        const maxLength = Math.min(habitIdStr.length, 100);
+        for (let j = 0; j < maxLength; j++) {
+          habitHash = (habitHash << 5) - habitHash + habitIdStr.charCodeAt(j);
+          habitHash |= 0;
+        }
+        const scaledHabitHash = Math.abs(habitHash) * 1000000;
+
+        // Generate the seed as the UI would
+        const seed = scaledHabitHash + dateNumber;
+
+        // Get photo for this seed
+        const photo = await getRandomPhoto(seed);
+
+        // Store result
+        results.push({
+          day: i + 1,
+          date: dateString,
+          seed,
+          photoId: photo?.id || "none",
+          // Include truncated URL to verify difference
+          photoUrlPreview: photo?.url
+            ? `${photo.url.substring(0, 30)}...`
+            : "none",
+        });
+      }
+
+      // Return all results
+      res.status(200).json({
+        message: `Photo rotation test for ${daysToSimulate} days`,
+        results,
+      });
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      res.status(500).json({
+        message: "Error in rotation test",
+        error: errorMessage,
+      });
+    }
+  },
   // Proxy a Google Photos image to avoid CORS issues
   proxyPhoto: async (req: Request, res: Response): Promise<void> => {
     try {
@@ -63,7 +133,10 @@ export const photoController = {
           responseType: "arraybuffer",
           headers: {
             // Set proper referer to avoid Google Photos blocking the request
-            Referer: process.env.APP_URL || "http://localhost:5050",
+            Referer:
+              process.env.APP_URL ||
+              "http://localhost:5050" ||
+              "http://localhost:5051",
             // Use a common user agent
             "User-Agent":
               "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",

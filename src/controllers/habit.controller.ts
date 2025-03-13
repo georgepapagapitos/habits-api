@@ -488,28 +488,52 @@ export const habitController = {
               "../services/google-photos.service"
             );
 
-            // Generate a consistent seed based on habit ID and the current date
-            // This ensures the same habit gets the same photo on a given day
-            // but different photos on different days
-            const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD format
+            // If no seed was provided by the client, generate a consistent seed
+            // This is a fallback when the client hasn't provided a seed
+            // Ideally, the client should provide a seed that follows a similar algorithm
+            let consistentSeed;
 
-            // Create a deterministic hash from habit ID + date
-            let dateSeed = 0;
-            for (let i = 0; i < today.length; i++) {
-              dateSeed = (dateSeed << 5) - dateSeed + today.charCodeAt(i);
-              dateSeed |= 0; // Convert to 32bit integer
+            if (seed === undefined) {
+              // Generate a consistent seed based on habit ID and the current date
+              // This ensures the same habit gets the same photo on a given day
+              const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD format
+
+              // Create a deterministic hash from date
+              let dateSeed = 0;
+              for (let i = 0; i < today.length; i++) {
+                dateSeed = (dateSeed << 5) - dateSeed + today.charCodeAt(i);
+                dateSeed |= 0; // Convert to 32bit integer
+              }
+              dateSeed = Math.abs(dateSeed);
+
+              // Generate a seed matching the UI's simplified approach
+              // The UI uses: habitHash * 1000000 + dateNumber
+
+              // Create a habit hash (this matches client-side hashing)
+              let habitHash = 0;
+              for (let i = 0; i < req.params.id.length; i++) {
+                habitHash =
+                  (habitHash << 5) - habitHash + req.params.id.charCodeAt(i);
+                habitHash |= 0; // Convert to 32bit integer
+              }
+
+              // Scale the habit hash to be in the millions range
+              const scaledHabitHash = Math.abs(habitHash) * 1000000;
+
+              // Date part: convert YYYY-MM-DD to YYYYMMDD number
+              // This is simpler than the previous date hash approach and matches UI logic
+              const dateNumber = parseInt(today.replace(/-/g, ""));
+
+              // Combine the two matching the UI's approach
+              consistentSeed = scaledHabitHash + dateNumber;
+
+              console.log(
+                `Generated seed from habit ID and date: ${consistentSeed}`
+              );
+            } else {
+              consistentSeed = seed;
+              console.log(`Using client-provided seed: ${consistentSeed}`);
             }
-
-            // Combine with habit ID for uniqueness across habits
-            let habitSeed = dateSeed;
-            for (let i = 0; i < req.params.id.length; i++) {
-              habitSeed =
-                (habitSeed << 5) - habitSeed + req.params.id.charCodeAt(i);
-              habitSeed |= 0; // Convert to 32bit integer
-            }
-
-            // Use the consistent seed for deterministic photo selection within a day
-            const consistentSeed = Math.abs(habitSeed);
             rewardPhoto = await getRandomPhoto(consistentSeed);
 
             console.log(
