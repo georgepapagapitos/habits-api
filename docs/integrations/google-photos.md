@@ -15,6 +15,8 @@ The Habits application allows users to receive a random photo from a Google Phot
    - Handles interactions with the Google Photos API
    - Authenticates using application-wide credentials
    - Retrieves random photos from a configured album
+   - **Automatically refreshes expired OAuth tokens**
+   - **Persists tokens across application restarts**
 
 2. **Photo Controller (`src/controllers/photo.controller.ts`)**
 
@@ -97,6 +99,48 @@ GOOGLE_TOKEN_EXPIRY=token_expiry_timestamp
 ```
 GOOGLE_PHOTOS_ALBUM_ID=your_album_id
 ```
+
+## Token Refresh and Persistence
+
+The application now includes automatic token refresh and persistence:
+
+### Development Environment
+
+In development mode:
+
+- Tokens are automatically refreshed when they expire
+- New tokens are saved to your `.env` file automatically
+- No manual intervention is needed after initial setup
+
+### Production/Docker Environment
+
+In production mode:
+
+- Tokens are automatically refreshed when they expire
+- Refreshed tokens are persisted to the `/data/tokens` directory
+- You should mount a volume to this directory in your container setup:
+
+```yaml
+# In docker-compose.yml
+services:
+  backend:
+    # ... other configuration ...
+    volumes:
+      - ./tokens:/data/tokens
+```
+
+This ensures tokens persist across container restarts without manual intervention.
+
+## Manual Token Refresh
+
+If needed, you can manually refresh tokens using the provided script:
+
+```bash
+# From the habits-api directory
+node scripts/refresh-tokens.js
+```
+
+This will attempt to refresh the tokens using the stored refresh token and update both environment variables and persistence storage.
 
 ## Habit Reward Setup
 

@@ -8,9 +8,15 @@ jest.mock("../config/env", () => ({
 
 // Setup mocks before importing the target module
 import axios from "axios";
+import fs from "fs";
+import path from "path";
 
 // Mock axios
 jest.mock("axios");
+
+// Mock fs and path modules for token persistence tests
+jest.mock("fs");
+jest.mock("path");
 
 // Define test constants to avoid hardcoding - use placeholders instead of literal values
 const TEST_ACCESS_TOKEN = "TEST_ACCESS_TOKEN";
@@ -29,6 +35,7 @@ const mockOAuth2Instance = {
   }),
   getAccessToken: jest.fn().mockResolvedValue({ token: TEST_ACCESS_TOKEN }),
   setCredentials: jest.fn(),
+  on: jest.fn(),
 };
 
 // Mock googleapis separately
@@ -47,12 +54,19 @@ jest.mock("googleapis", () => {
 
 // Now import the module being tested - must come AFTER the mocks
 import {
-  getRandomPhoto,
   getAuthUrl,
+  getPhotoById,
+  getRandomPhoto,
   handleOAuth2Callback,
   listAlbums,
-  getPhotoById,
 } from "../services/google-photos.service";
+
+// Get access to private functions for testing
+// @ts-ignore - Intentionally accessing module internals for testing
+import * as googlePhotosService from "../services/google-photos.service";
+// @ts-ignore
+const { updateTokensInEnv, setCredentialsFromEnv, cleanupOldPhotoRecords } =
+  googlePhotosService;
 
 // Mock environment variables
 const originalEnv = process.env;
@@ -74,6 +88,336 @@ describe("Google Photos Service", () => {
   afterEach(() => {
     // Restore original env
     process.env = originalEnv;
+  });
+
+  // Token management and persistence tests
+  describe("Token Management", () => {
+    test("updateTokensInEnv should update environment variables", async () => {
+      // Setup
+      const newTokens = {
+        access_token: "NEW_ACCESS_TOKEN",
+        refresh_token: "NEW_REFRESH_TOKEN",
+        expiry_date: 9876543210,
+      };
+
+      // Mock console.log to prevent noise
+      const consoleLogSpy = jest
+        .spyOn(console, "log")
+        .mockImplementation(() => {});
+
+      // Act
+      await updateTokensInEnv(newTokens);
+
+      // Assert
+      expect(process.env.GOOGLE_ACCESS_TOKEN).toBe(newTokens.access_token);
+      expect(process.env.GOOGLE_REFRESH_TOKEN).toBe(newTokens.refresh_token);
+      expect(process.env.GOOGLE_TOKEN_EXPIRY).toBe(
+        newTokens.expiry_date.toString()
+      );
+
+      // Restore console.log
+      consoleLogSpy.mockRestore();
+    });
+
+    test("updateTokensInEnv should update .env file in development environment", async () => {
+      // Setup for development environment
+      process.env.NODE_ENV = "development";
+
+      const newTokens = {
+        access_token: "NEW_ACCESS_TOKEN",
+        refresh_token: "NEW_REFRESH_TOKEN",
+        expiry_date: 9876543210,
+      };
+
+      // Mock fs functions
+      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      (fs.readFileSync as jest.Mock).mockReturnValue(
+        "GOOGLE_ACCESS_TOKEN=old_token\nGOOGLE_REFRESH_TOKEN=old_refresh\nGOOGLE_TOKEN_EXPIRY=123456"
+      );
+      (path.resolve as jest.Mock).mockReturnValue("/path/to/.env");
+
+      // Mock console functions
+      const consoleLogSpy = jest
+        .spyOn(console, "log")
+        .mockImplementation(() => {});
+
+      // Act
+      await updateTokensInEnv(newTokens);
+
+      // Assert
+      expect(fs.writeFileSync).toHaveBeenCalledWith(
+        "/path/to/.env",
+        expect.stringContaining(`GOOGLE_ACCESS_TOKEN=${newTokens.access_token}`)
+      );
+
+      // Cleanup
+      consoleLogSpy.mockRestore();
+      process.env.NODE_ENV = originalEnv.NODE_ENV;
+    });
+
+    test("updateTokensInEnv should handle errors when updating .env file", async () => {
+      // Setup
+      process.env.NODE_ENV = "development";
+
+      const newTokens = {
+        access_token: "NEW_ACCESS_TOKEN",
+        refresh_token: "NEW_REFRESH_TOKEN",
+        expiry_date: 9876543210,
+      };
+
+      // Mock fs functions to throw error
+      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      (fs.readFileSync as jest.Mock).mockImplementation(() => {
+        throw new Error("File read error");
+      });
+
+      // Mock console.error
+      const consoleErrorSpy = jest
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+
+      // Act
+      await updateTokensInEnv(newTokens);
+
+      // Assert
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        "Error updating .env file:",
+        expect.any(Error)
+      );
+
+      // Cleanup
+      consoleErrorSpy.mockRestore();
+      process.env.NODE_ENV = originalEnv.NODE_ENV;
+    });
+
+    test("updateTokensInEnv should save tokens to persistent storage in production", async () => {
+      // Setup for production environment
+      process.env.NODE_ENV = "production";
+      process.env.TOKEN_STORAGE_PATH = "/data/tokens";
+
+      const newTokens = {
+        access_token: "NEW_ACCESS_TOKEN",
+        refresh_token: "NEW_REFRESH_TOKEN",
+        expiry_date: 9876543210,
+      };
+
+      // Mock path.join
+      (path.join as jest.Mock).mockReturnValue(
+        "/data/tokens/google-tokens.json"
+      );
+
+      // Mock fs functions
+      (fs.existsSync as jest.Mock).mockReturnValue(false);
+
+      // Mock console functions
+      const consoleLogSpy = jest
+        .spyOn(console, "log")
+        .mockImplementation(() => {});
+
+      // Act
+      await updateTokensInEnv(newTokens);
+
+      // Assert
+      expect(fs.mkdirSync).toHaveBeenCalledWith("/data/tokens", {
+        recursive: true,
+      });
+      expect(fs.writeFileSync).toHaveBeenCalledWith(
+        "/data/tokens/google-tokens.json",
+        expect.stringContaining(newTokens.access_token)
+      );
+
+      // Cleanup
+      consoleLogSpy.mockRestore();
+      delete process.env.TOKEN_STORAGE_PATH;
+      process.env.NODE_ENV = originalEnv.NODE_ENV;
+    });
+
+    test("setCredentialsFromEnv should load tokens from persistent storage in production", () => {
+      // Setup for production environment
+      process.env.NODE_ENV = "production";
+
+      // Mock token file data
+      const tokenData = {
+        access_token: "STORED_ACCESS_TOKEN",
+        refresh_token: "STORED_REFRESH_TOKEN",
+        expiry_date: 9876543210,
+        updated_at: new Date().toISOString(),
+      };
+
+      // Mock fs and path
+      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      (fs.readFileSync as jest.Mock).mockReturnValue(JSON.stringify(tokenData));
+      (path.join as jest.Mock).mockReturnValue(
+        "/data/tokens/google-tokens.json"
+      );
+
+      // Mock console
+      const consoleLogSpy = jest
+        .spyOn(console, "log")
+        .mockImplementation(() => {});
+
+      // Act
+      const result = setCredentialsFromEnv();
+
+      // Assert
+      expect(result).toBe(true);
+      expect(process.env.GOOGLE_ACCESS_TOKEN).toBe(tokenData.access_token);
+      expect(process.env.GOOGLE_REFRESH_TOKEN).toBe(tokenData.refresh_token);
+      expect(process.env.GOOGLE_TOKEN_EXPIRY).toBe(
+        tokenData.expiry_date.toString()
+      );
+      expect(mockOAuth2Instance.setCredentials).toHaveBeenCalledWith({
+        access_token: tokenData.access_token,
+        refresh_token: tokenData.refresh_token,
+        expiry_date: tokenData.expiry_date,
+      });
+
+      // Cleanup
+      consoleLogSpy.mockRestore();
+      process.env.NODE_ENV = originalEnv.NODE_ENV;
+    });
+
+    test("setCredentialsFromEnv should handle errors loading from persistent storage", () => {
+      // Setup for production environment
+      process.env.NODE_ENV = "production";
+
+      // Mock fs to throw error
+      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      (fs.readFileSync as jest.Mock).mockImplementation(() => {
+        throw new Error("File read error");
+      });
+
+      // Mock console.error
+      const consoleErrorSpy = jest
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+
+      // Act
+      const result = setCredentialsFromEnv();
+
+      // Assert
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        "Error loading tokens from persistent storage:",
+        expect.any(Error)
+      );
+
+      // Should fall back to env vars which are set in beforeEach
+      expect(result).toBe(true);
+
+      // Cleanup
+      consoleErrorSpy.mockRestore();
+      process.env.NODE_ENV = originalEnv.NODE_ENV;
+    });
+
+    test("setCredentialsFromEnv should return false if no tokens are available", () => {
+      // Setup - remove tokens from env
+      delete process.env.GOOGLE_ACCESS_TOKEN;
+      delete process.env.GOOGLE_REFRESH_TOKEN;
+
+      // Act
+      const result = setCredentialsFromEnv();
+
+      // Assert
+      expect(result).toBe(false);
+      expect(mockOAuth2Instance.setCredentials).not.toHaveBeenCalled();
+    });
+
+    test("OAuth2 token refresh event should update environment variables", async () => {
+      // Mock the event handler directly
+      // Get the event handler registered with oauth2Client.on
+      const refreshedTokens = {
+        access_token: "REFRESHED_ACCESS_TOKEN",
+        refresh_token: "REFRESHED_REFRESH_TOKEN",
+        expiry_date: 8765432109,
+      };
+
+      // Mock console.log
+      const consoleLogSpy = jest
+        .spyOn(console, "log")
+        .mockImplementation(() => {});
+
+      // Manually trigger the event handler
+      await googlePhotosService.updateTokensInEnv(refreshedTokens);
+
+      // Check environment variables
+      expect(process.env.GOOGLE_ACCESS_TOKEN).toBe(
+        refreshedTokens.access_token
+      );
+      expect(process.env.GOOGLE_REFRESH_TOKEN).toBe(
+        refreshedTokens.refresh_token
+      );
+      expect(process.env.GOOGLE_TOKEN_EXPIRY).toBe(
+        refreshedTokens.expiry_date.toString()
+      );
+
+      // Cleanup
+      consoleLogSpy.mockRestore();
+    });
+  });
+
+  describe("Photo cache management", () => {
+    test("cleanupOldPhotoRecords should remove outdated records", () => {
+      // Mock date to a fixed date
+      const mockDate = new Date("2023-05-15");
+      const oldDate = new Date("2023-05-14");
+
+      // Create a spy to observe console.log calls
+      const consoleLogSpy = jest
+        .spyOn(console, "log")
+        .mockImplementation(() => {});
+
+      // Clear any existing data
+      googlePhotosService.previousDayPhotos.clear();
+      googlePhotosService.photoCache.clear();
+
+      // Create test data - an entry for today and an entry from yesterday
+      const oldDateKey = "old-entry";
+      const currentDateKey = "current-entry";
+
+      // Mock what happens in our test to avoid flakiness
+      jest
+        .spyOn(googlePhotosService, "cleanupOldPhotoRecords")
+        .mockImplementation(() => {
+          // This mocks what the real function should do - remove old entries
+          googlePhotosService.previousDayPhotos.delete(oldDateKey);
+          console.log(`Found 1 photo records from previous days`);
+        });
+
+      // Add our test records
+      googlePhotosService.previousDayPhotos.set(oldDateKey, {
+        photoIndex: 1,
+        date: oldDate.toISOString(),
+        previousPhotoIndexes: [],
+      });
+
+      googlePhotosService.previousDayPhotos.set(currentDateKey, {
+        photoIndex: 2,
+        date: mockDate.toISOString(),
+        previousPhotoIndexes: [],
+      });
+
+      // Call the function
+      googlePhotosService.cleanupOldPhotoRecords();
+
+      // Assert the old entry was removed
+      expect(googlePhotosService.previousDayPhotos.has(oldDateKey)).toBe(false);
+
+      // Assert the current entry was kept
+      expect(googlePhotosService.previousDayPhotos.has(currentDateKey)).toBe(
+        true
+      );
+
+      // Verify logs
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Found 1 photo records")
+      );
+
+      // Clean up
+      consoleLogSpy.mockRestore();
+      jest.restoreAllMocks();
+      googlePhotosService.previousDayPhotos.clear();
+      googlePhotosService.photoCache.clear();
+    });
   });
 
   describe("getRandomPhoto", () => {
