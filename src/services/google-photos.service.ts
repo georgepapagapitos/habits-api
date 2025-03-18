@@ -1,27 +1,158 @@
-import { google } from "googleapis";
 import axios from "axios";
+import { google } from "googleapis";
 import {
   GOOGLE_CLIENT_ID,
   GOOGLE_CLIENT_SECRET,
-  GOOGLE_REDIRECT_URI,
   GOOGLE_PHOTOS_ALBUM_ID,
+  GOOGLE_REDIRECT_URI,
 } from "../config/env";
 import {
+  AlbumResponse,
+  GoogleAlbum,
   GooglePhoto,
   PhotoResponse,
-  GoogleAlbum,
-  AlbumResponse,
 } from "../types/photo.types";
 
 // Create OAuth2 client
-const oauth2Client = new google.auth.OAuth2(
+export const oauth2Client = new google.auth.OAuth2(
   GOOGLE_CLIENT_ID,
   GOOGLE_CLIENT_SECRET,
   GOOGLE_REDIRECT_URI
 );
 
+// Function to update tokens in the environment and optionally in the .env file
+export const updateTokensInEnv = async (tokens: {
+  access_token?: string | null;
+  refresh_token?: string | null;
+  expiry_date?: number | null;
+}) => {
+  try {
+    if (tokens.access_token) {
+      process.env.GOOGLE_ACCESS_TOKEN = tokens.access_token;
+    }
+
+    if (tokens.refresh_token) {
+      process.env.GOOGLE_REFRESH_TOKEN = tokens.refresh_token;
+    }
+
+    if (tokens.expiry_date) {
+      process.env.GOOGLE_TOKEN_EXPIRY = tokens.expiry_date.toString();
+    }
+
+    console.log("Updated OAuth tokens in environment variables");
+
+    // For development: Update the .env file
+    if (process.env.NODE_ENV !== "production") {
+      try {
+        const fs = require("fs");
+        const path = require("path");
+        const envPath = path.resolve(__dirname, "../../.env");
+
+        if (fs.existsSync(envPath)) {
+          let envContent = fs.readFileSync(envPath, "utf8");
+
+          if (tokens.access_token) {
+            envContent = envContent.replace(
+              /GOOGLE_ACCESS_TOKEN=.*/,
+              `GOOGLE_ACCESS_TOKEN=${tokens.access_token}`
+            );
+          }
+
+          if (tokens.refresh_token) {
+            envContent = envContent.replace(
+              /GOOGLE_REFRESH_TOKEN=.*/,
+              `GOOGLE_REFRESH_TOKEN=${tokens.refresh_token}`
+            );
+          }
+
+          if (tokens.expiry_date) {
+            envContent = envContent.replace(
+              /GOOGLE_TOKEN_EXPIRY=.*/,
+              `GOOGLE_TOKEN_EXPIRY=${tokens.expiry_date}`
+            );
+          }
+
+          fs.writeFileSync(envPath, envContent);
+          console.log("Updated OAuth tokens in .env file");
+        }
+      } catch (err) {
+        console.error("Error updating .env file:", err);
+      }
+    }
+    // For production: Store tokens in a persistent file
+    else {
+      try {
+        const fs = require("fs");
+        const path = require("path");
+        const tokenDir = process.env.TOKEN_STORAGE_PATH || "/data/tokens";
+        const tokenPath = path.join(tokenDir, "google-tokens.json");
+
+        // Ensure directory exists
+        if (!fs.existsSync(tokenDir)) {
+          fs.mkdirSync(tokenDir, { recursive: true });
+        }
+
+        // Save tokens to file
+        const tokenData = {
+          access_token: tokens.access_token || process.env.GOOGLE_ACCESS_TOKEN,
+          refresh_token:
+            tokens.refresh_token || process.env.GOOGLE_REFRESH_TOKEN,
+          expiry_date: tokens.expiry_date || process.env.GOOGLE_TOKEN_EXPIRY,
+          updated_at: new Date().toISOString(),
+        };
+
+        fs.writeFileSync(tokenPath, JSON.stringify(tokenData, null, 2));
+        console.log("Updated OAuth tokens in persistent storage");
+      } catch (err) {
+        console.error("Error updating token storage:", err);
+      }
+    }
+  } catch (err) {
+    console.error("Error updating tokens in environment:", err);
+  }
+};
+
+// Set up token refresh callback
+oauth2Client.on("tokens", (tokens) => {
+  console.log("Tokens refreshed automatically by Google auth library");
+  updateTokensInEnv(tokens);
+});
+
 // Set credentials from environment variables
-const setCredentialsFromEnv = () => {
+export const setCredentialsFromEnv = () => {
+  // Try to load tokens from persistent storage first (for production)
+  if (process.env.NODE_ENV === "production") {
+    try {
+      const fs = require("fs");
+      const path = require("path");
+      const tokenDir = process.env.TOKEN_STORAGE_PATH || "/data/tokens";
+      const tokenPath = path.join(tokenDir, "google-tokens.json");
+
+      if (fs.existsSync(tokenPath)) {
+        const tokenData = JSON.parse(fs.readFileSync(tokenPath, "utf8"));
+
+        // Update environment variables with the stored tokens
+        if (tokenData.access_token) {
+          process.env.GOOGLE_ACCESS_TOKEN = tokenData.access_token;
+        }
+        if (tokenData.refresh_token) {
+          process.env.GOOGLE_REFRESH_TOKEN = tokenData.refresh_token;
+        }
+        if (tokenData.expiry_date) {
+          process.env.GOOGLE_TOKEN_EXPIRY = tokenData.expiry_date.toString();
+        }
+
+        console.log(
+          "Loaded tokens from persistent storage, last updated:",
+          tokenData.updated_at
+        );
+      }
+    } catch (err) {
+      console.error("Error loading tokens from persistent storage:", err);
+      // Continue with environment variables
+    }
+  }
+
   // In a real app, you would securely retrieve the tokens from a database or another secure location
   // For development, we'll use environment variables
   if (process.env.GOOGLE_ACCESS_TOKEN && process.env.GOOGLE_REFRESH_TOKEN) {
@@ -37,6 +168,9 @@ const setCredentialsFromEnv = () => {
   return false;
 };
 
+// Set credentials at module load time
+setCredentialsFromEnv();
+
 // Enhanced in-memory cache for photos with timestamp for TTL
 // Key is the seed, value contains the photo response and timestamp
 interface CachedPhoto {
@@ -46,7 +180,7 @@ interface CachedPhoto {
   previousPhotoIndex?: number; // Store the previous day's photo index
 }
 
-const photoCache: Map<number, CachedPhoto> = new Map();
+export const photoCache: Map<number, CachedPhoto> = new Map();
 
 // Cache TTL in milliseconds (24 hours)
 const PHOTO_CACHE_TTL = 24 * 60 * 60 * 1000;
@@ -60,7 +194,7 @@ interface PreviousPhotoRecord {
   previousPhotoIndexes?: number[];
 }
 
-const previousDayPhotos: Map<string, PreviousPhotoRecord> = new Map();
+export const previousDayPhotos: Map<string, PreviousPhotoRecord> = new Map();
 
 /**
  * Checks and cleans up outdated photo records.
@@ -72,7 +206,7 @@ const previousDayPhotos: Map<string, PreviousPhotoRecord> = new Map();
  *
  * This is the main function that ensures different photos each day.
  */
-const cleanupOldPhotoRecords = (): void => {
+export const cleanupOldPhotoRecords = (): void => {
   const today = new Date();
   const todayString = `${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate()}`;
 
@@ -518,16 +652,16 @@ export const handleOAuth2Callback = async (code: string): Promise<void> => {
 
     oauth2Client.setCredentials(tokens);
 
+    // Update tokens in environment and .env file
+    await updateTokensInEnv(tokens);
+
     // Log instructions for the next step
     console.log("\n");
     console.log("----------------------------------------");
-    console.log("IMPORTANT: Add these tokens to your .env file:");
+    console.log(
+      "IMPORTANT: Tokens have been automatically updated in your .env file"
+    );
     console.log("----------------------------------------");
-    console.log(`GOOGLE_ACCESS_TOKEN=${tokens.access_token}`);
-    console.log(`GOOGLE_REFRESH_TOKEN=${tokens.refresh_token}`);
-    if (tokens.expiry_date) {
-      console.log(`GOOGLE_TOKEN_EXPIRY=${tokens.expiry_date}`);
-    }
     console.log(
       "\nNext step: Find your album ID and add it as GOOGLE_PHOTOS_ALBUM_ID"
     );
