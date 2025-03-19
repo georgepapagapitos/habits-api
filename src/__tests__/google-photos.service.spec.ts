@@ -62,11 +62,17 @@ import {
 } from "../services/google-photos.service";
 
 // Get access to private functions for testing
-// @ts-ignore - Intentionally accessing module internals for testing
+/* eslint-disable @typescript-eslint/ban-ts-comment */
+// Import the module again to access unexported functions
 import * as googlePhotosService from "../services/google-photos.service";
-// @ts-ignore
-const { updateTokensInEnv, setCredentialsFromEnv, cleanupOldPhotoRecords } =
-  googlePhotosService;
+
+// Extract unexported functions using type assertions
+const { updateTokensInEnv, setCredentialsFromEnv } =
+  googlePhotosService as unknown as {
+    updateTokensInEnv: (tokens: any) => Promise<void>;
+    setCredentialsFromEnv: () => void;
+  };
+/* eslint-enable @typescript-eslint/ban-ts-comment */
 
 // Mock environment variables
 const originalEnv = process.env;

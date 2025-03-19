@@ -61,6 +61,17 @@ function calculateStreak(
   // Get the most recent completion
   const mostRecentCompletion = completedDates[0];
 
+  // Check if there's at least one completion on a due day
+  // If not, streak should be 0 regardless of other factors
+  const hasAnyDueDayCompletion = completedDates.some((date) => {
+    const dayIndex = date.getDay();
+    return frequencyIndices.includes(dayIndex);
+  });
+
+  if (!hasAnyDueDayCompletion) {
+    return 0; // No completions on due days means no streak
+  }
+
   // Check if completed today
   const isCompletedToday = completedDates.some(
     (date) => date.getTime() === todayStart.getTime()
@@ -395,5 +406,30 @@ describe("Streak Calculation", () => {
 
     // Streak should be 0 since it's not due today and not completed today
     expect(calculateStreak(habit, today)).toBe(0);
+  });
+
+  test("streak should be 0 when all completions are on non-due days", () => {
+    // Create a habit that's only due on Sundays
+    const mockToday = new Date(2025, 2, 5); // Wednesday, March 5, 2025
+    mockToday.setHours(0, 0, 0, 0);
+
+    // The completions are on Monday (March 3) and Tuesday (March 4)
+    const monday = new Date(2025, 2, 3);
+    monday.setHours(0, 0, 0, 0);
+
+    const tuesday = new Date(2025, 2, 4);
+    tuesday.setHours(0, 0, 0, 0);
+
+    // Create a habit due only on Sundays but with completions on Monday and Tuesday
+    const habit = createTestHabit({
+      frequency: ["sunday"],
+      completedDates: [
+        monday.toISOString(), // Monday
+        tuesday.toISOString(), // Tuesday
+      ],
+    });
+
+    // Streak should be 0 since none of the completions are on the due day (Sunday)
+    expect(calculateStreak(habit, mockToday)).toBe(0);
   });
 });

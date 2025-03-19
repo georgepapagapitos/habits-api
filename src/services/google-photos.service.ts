@@ -12,6 +12,12 @@ import {
   GooglePhoto,
   PhotoResponse,
 } from "../types/photo.types";
+import dotenv from "dotenv";
+import path from "path";
+import fs from "fs";
+
+// Load environment variables
+dotenv.config();
 
 // Create OAuth2 client
 export const oauth2Client = new google.auth.OAuth2(
@@ -44,8 +50,6 @@ export const updateTokensInEnv = async (tokens: {
     // For development: Update the .env file
     if (process.env.NODE_ENV !== "production") {
       try {
-        const fs = require("fs");
-        const path = require("path");
         const envPath = path.resolve(__dirname, "../../.env");
 
         if (fs.existsSync(envPath)) {
@@ -82,8 +86,6 @@ export const updateTokensInEnv = async (tokens: {
     // For production: Store tokens in a persistent file
     else {
       try {
-        const fs = require("fs");
-        const path = require("path");
         const tokenDir = process.env.TOKEN_STORAGE_PATH || "/data/tokens";
         const tokenPath = path.join(tokenDir, "google-tokens.json");
 
@@ -123,8 +125,6 @@ export const setCredentialsFromEnv = () => {
   // Try to load tokens from persistent storage first (for production)
   if (process.env.NODE_ENV === "production") {
     try {
-      const fs = require("fs");
-      const path = require("path");
       const tokenDir = process.env.TOKEN_STORAGE_PATH || "/data/tokens";
       const tokenPath = path.join(tokenDir, "google-tokens.json");
 
