@@ -27,6 +27,9 @@ app.use(
 app.use(express.json()); // Parse JSON bodies
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
 
+// Trust proxy for rate limiting behind reverse proxy
+app.set("trust proxy", 1);
+
 // Health check endpoint for deployment verification
 app.get("/api/health", (req, res) => {
   res.status(200).json({ status: "ok", environment: process.env.NODE_ENV });

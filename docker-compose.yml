@@ -20,6 +20,8 @@ services:
       - GOOGLE_REFRESH_TOKEN=${GOOGLE_REFRESH_TOKEN}
       - GOOGLE_TOKEN_EXPIRY=${GOOGLE_TOKEN_EXPIRY}
       - GOOGLE_PHOTOS_ALBUM_ID=${GOOGLE_PHOTOS_ALBUM_ID}
+    volumes:
+      - ./tokens:/data/tokens
     networks:
       - app-network
 
