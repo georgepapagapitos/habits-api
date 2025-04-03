@@ -19,3 +19,6 @@ jobs:
       MONGODB_URI: ${{ secrets.MONGODB_URI }}
       DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+      TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
+      TEST_VALID_TOKEN: ${{ secrets.TEST_VALID_TOKEN }}
+      TEST_INVALID_TOKEN: ${{ secrets.TEST_INVALID_TOKEN }}

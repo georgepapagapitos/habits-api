@@ -176,6 +176,98 @@ const createSampleHabits = async (userId: string): Promise<void> => {
     }
     await weekendHabit.save();
 
+    // 5. Habit with bonus completions between due dates
+    const bonusHabit = await Habit.create({
+      name: "Meditation",
+      description: "Meditate for 10 minutes",
+      color: "#f1c40f",
+      icon: "meditation",
+      frequency: ["monday", "friday"],
+      timeOfDay: "morning",
+      userId,
+      userTimezone,
+      completedDates: [],
+      startDate: subDays(today, 14),
+    });
+
+    // Add completions on due days and bonus days
+    const bonusDueCompletions = [0, 7, 14]; // Mondays and Fridays
+    const bonusCompletions = [1, 2, 3, 8, 9, 10]; // Days between due dates
+
+    for (const day of bonusDueCompletions) {
+      bonusHabit.completedDates.push(subDays(today, day));
+    }
+    for (const day of bonusCompletions) {
+      bonusHabit.completedDates.push(subDays(today, day));
+    }
+    await bonusHabit.save();
+
+    // 6. Timezone-sensitive habit (to test timezone handling)
+    const timezoneHabit = await Habit.create({
+      name: "Evening Journal",
+      description: "Write in journal before bed",
+      color: "#1abc9c",
+      icon: "journal",
+      frequency: ["monday", "wednesday", "friday"],
+      timeOfDay: "evening",
+      userId,
+      userTimezone: "Asia/Tokyo", // Different timezone
+      completedDates: [],
+      startDate: subDays(today, 14),
+    });
+
+    // Add completions with timezone-sensitive dates
+    const timezoneCompletions = [0, 2, 4, 7, 9];
+    for (const day of timezoneCompletions) {
+      const date = subDays(today, day);
+      // Set to end of day in Tokyo timezone
+      date.setHours(23, 59, 59, 999);
+      timezoneHabit.completedDates.push(date);
+    }
+    await timezoneHabit.save();
+
+    // 7. Habit with missed due dates (to test streak breaking)
+    const missedHabit = await Habit.create({
+      name: "Language Practice",
+      description: "Practice language for 20 minutes",
+      color: "#e67e22",
+      icon: "language",
+      frequency: ["monday", "wednesday", "friday"],
+      timeOfDay: "morning",
+      userId,
+      userTimezone,
+      completedDates: [],
+      startDate: subDays(today, 14),
+    });
+
+    // Add completions with intentional gaps
+    const missedCompletions = [0, 2, 7, 9]; // Missing some due dates
+    for (const day of missedCompletions) {
+      missedHabit.completedDates.push(subDays(today, day));
+    }
+    await missedHabit.save();
+
+    // 8. Habit with leap year dates (to test date edge cases)
+    const leapYearHabit = await Habit.create({
+      name: "Leap Year Habit",
+      description: "Test habit for leap year dates",
+      color: "#34495e",
+      icon: "calendar",
+      frequency: ["monday"],
+      timeOfDay: "anytime",
+      userId,
+      userTimezone,
+      completedDates: [],
+      startDate: subDays(today, 14),
+    });
+
+    // Add completions including February 29th
+    const leapYear = 2024;
+    const feb29 = new Date(leapYear, 1, 29);
+    const feb28 = new Date(leapYear, 1, 28);
+    leapYearHabit.completedDates.push(feb29, feb28);
+    await leapYearHabit.save();
+
     console.log("Sample habits created successfully");
   } catch (error) {
     console.error("Error creating sample habits:", error);

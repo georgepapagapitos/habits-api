@@ -36,7 +36,11 @@ export const protect: RequestHandler = async (
       const user = await User.findById(decoded.id).select("-password");
 
       if (!user) {
-        res.status(401).json({ message: "Not authorized, user not found" });
+        res.status(401).json({
+          success: false,
+          message: "Not authorized, user not found",
+          error: "Server Error",
+        });
         return;
       }
 
@@ -51,14 +55,22 @@ export const protect: RequestHandler = async (
       return;
     } catch (error) {
       console.error(error);
-      res.status(401).json({ message: "Not authorized, token failed" });
+      res.status(401).json({
+        success: false,
+        message: "Not authorized, token failed",
+        error: "Server Error",
+      });
       return;
     }
   }
 
   // If no token
   if (!token) {
-    res.status(401).json({ message: "Not authorized, no token" });
+    res.status(401).json({
+      success: false,
+      message: "Not authorized, no token",
+      error: "Server Error",
+    });
     return;
   }
 };

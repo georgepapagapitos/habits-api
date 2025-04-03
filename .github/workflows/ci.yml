@@ -16,3 +16,6 @@ jobs:
     secrets:
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
       MONGODB_URI: ${{ secrets.MONGODB_URI }}
+      TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
+      TEST_VALID_TOKEN: ${{ secrets.TEST_VALID_TOKEN }}
+      TEST_INVALID_TOKEN: ${{ secrets.TEST_INVALID_TOKEN }}

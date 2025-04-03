@@ -181,13 +181,23 @@ export const habitController = {
       const habit = await Habit.findById(req.params.id);
 
       if (!habit) {
-        sendErrorResponse(res, 404, `Habit with ID ${req.params.id} not found`);
+        sendErrorResponse(
+          res,
+          404,
+          `Habit with ID ${req.params.id} not found`,
+          "Server Error"
+        );
         return;
       }
 
       // Check if the habit belongs to the authenticated user
       if (habit.userId !== req.user.id) {
-        sendErrorResponse(res, 403, "User not authorized to reset this habit");
+        sendErrorResponse(
+          res,
+          403,
+          "User not authorized to reset this habit",
+          "Server Error"
+        );
         return;
       }
 
@@ -204,7 +214,7 @@ export const habitController = {
       });
     } catch (error) {
       console.error("Error resetting habit:", error);
-      sendErrorResponse(res, 500, "Server Error", error);
+      sendErrorResponse(res, 500, "Error resetting habit", error);
     }
   },
 

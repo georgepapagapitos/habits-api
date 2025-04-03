@@ -67,10 +67,17 @@ import {
 // Import the module again to access unexported functions
 import * as googlePhotosService from "../services/google-photos.service";
 
+// Define an interface for the token structure
+interface TokenInfo {
+  access_token: string;
+  refresh_token: string;
+  expiry_date: number;
+}
+
 // Extract unexported functions using type assertions
 const { updateTokensInEnv, setCredentialsFromEnv } =
   googlePhotosService as unknown as {
-    updateTokensInEnv: (tokens: any) => Promise<void>;
+    updateTokensInEnv: (tokens: TokenInfo) => Promise<void>;
     setCredentialsFromEnv: () => void;
   };
 /* eslint-enable @typescript-eslint/ban-ts-comment */

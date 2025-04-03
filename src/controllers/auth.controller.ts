@@ -124,10 +124,13 @@ export const getCurrentUser = async (
       return;
     }
 
-    res.json({
-      id: user._id,
-      username: user.username,
-      email: user.email,
+    res.status(200).json({
+      success: true,
+      data: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+      },
     });
   } catch (error) {
     console.error(error);

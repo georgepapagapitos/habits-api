@@ -27,6 +27,19 @@ describe("Habit Stats Controller", () => {
     userId: string;
     startDate: Date;
   }>;
+  let originalConsoleError: typeof console.error;
+
+  beforeAll(() => {
+    // Store the original console.error
+    originalConsoleError = console.error;
+    // Replace console.error with a no-op function for tests
+    console.error = jest.fn();
+  });
+
+  afterAll(() => {
+    // Restore the original console.error
+    console.error = originalConsoleError;
+  });
 
   beforeEach(() => {
     // Reset mocks for each test
