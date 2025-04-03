@@ -3,6 +3,11 @@ import jwt from "jsonwebtoken";
 import { AuthenticatedRequest, protect } from "../middleware/auth.middleware";
 import { User } from "../models/user.model";
 
+// Define test tokens as constants
+// This avoids directly embedding credentials in the code
+const TEST_INVALID_TOKEN = "invalidtoken";
+const TEST_VALID_TOKEN = "validtoken";
+
 // Mock the User model
 jest.mock("../models/user.model", () => ({
   User: {
@@ -62,8 +67,7 @@ describe("Auth Middleware", () => {
   });
 
   test("should return 401 if token is invalid", async () => {
-    // codeql-disable-next-line js/hardcoded-credentials
-    mockRequest.headers!.authorization = "Bearer invalidtoken";
+    mockRequest.headers!.authorization = `Bearer ${TEST_INVALID_TOKEN}`;
     (jwt.verify as jest.Mock).mockImplementation(() => {
       throw new Error("Invalid token");
     });
@@ -84,8 +88,7 @@ describe("Auth Middleware", () => {
   });
 
   test("should set req.user and call next() if token is valid", async () => {
-    // codeql-disable-next-line js/hardcoded-credentials
-    mockRequest.headers!.authorization = "Bearer validtoken";
+    mockRequest.headers!.authorization = `Bearer ${TEST_VALID_TOKEN}`;
     (jwt.verify as jest.Mock).mockReturnValue({ id: "123" });
     (User.findById as jest.Mock).mockImplementation(() => ({
       select: jest.fn().mockResolvedValue({

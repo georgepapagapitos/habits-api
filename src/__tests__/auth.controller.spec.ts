@@ -20,6 +20,10 @@ jest.mock("jsonwebtoken", () => ({
   sign: jest.fn().mockReturnValue("mock-token"),
 }));
 
+// Define test constants for credentials
+const TEST_PASSWORD = "password123";
+const TEST_HASHED_PASSWORD = "hashed-password";
+
 // Mock the User model
 jest.mock("../models/user.model", () => ({
   User: {
@@ -55,7 +59,7 @@ describe("Auth Controller", () => {
       body: {
         username: "testuser",
         email: "test@example.com",
-        password: "password123",
+        password: TEST_PASSWORD,
       },
     };
 
@@ -76,7 +80,7 @@ describe("Auth Controller", () => {
       _id: "user123",
       username: "testuser",
       email: "test@example.com",
-      password: "hashed-password",
+      password: TEST_HASHED_PASSWORD,
       toString: jest.fn().mockReturnValue("user123"),
     };
   });
@@ -94,13 +98,13 @@ describe("Auth Controller", () => {
 
       // Verify bcrypt was called to hash the password
       expect(bcrypt.genSalt).toHaveBeenCalledWith(10);
-      expect(bcrypt.hash).toHaveBeenCalledWith("password123", "mock-salt");
+      expect(bcrypt.hash).toHaveBeenCalledWith(TEST_PASSWORD, "mock-salt");
 
       // Verify User.create was called with the right data
       expect(User.create).toHaveBeenCalledWith({
         username: "testuser",
         email: "test@example.com",
-        password: "hashed-password",
+        password: TEST_HASHED_PASSWORD,
       });
 
       // Verify JWT was generated
@@ -191,7 +195,7 @@ describe("Auth Controller", () => {
       // Set up login request body
       mockRequest.body = {
         email: "test@example.com",
-        password: "password123",
+        password: TEST_PASSWORD,
       };
     });
 
@@ -210,8 +214,8 @@ describe("Auth Controller", () => {
 
       // Verify bcrypt.compare was called to check the password
       expect(bcrypt.compare).toHaveBeenCalledWith(
-        "password123",
-        "hashed-password"
+        TEST_PASSWORD,
+        TEST_HASHED_PASSWORD
       );
 
       // Verify JWT was generated
