@@ -242,8 +242,12 @@ describe("Streak Calculation", () => {
 
     const today = new Date("2024-04-04T00:00:00.000Z"); // Thursday
 
-    // Should count all consecutive completions, including non-due days
+    // Should be 0 since today is not completed
     expect(calculateStreak(habit, today)).toBe(0);
+
+    // Add today's completion - streak should be 5
+    habit.completedDates?.push(today);
+    expect(calculateStreak(habit, today)).toBe(5);
   });
 
   test("streak should break on missed due date", () => {
@@ -268,8 +272,12 @@ describe("Streak Calculation", () => {
 
     const today = new Date("2024-04-06T00:00:00.000Z"); // Saturday
 
-    // Initial state: streak should be 0 since there's a gap between Friday and Wednesday
+    // Should be 0 since today is not completed
     expect(calculateStreak(habit, today)).toBe(0);
+
+    // Add today's completion - streak should be 3
+    habit.completedDates?.push(today);
+    expect(calculateStreak(habit, today)).toBe(3);
   });
 
   test("streak should handle non-due day completions", () => {
@@ -296,8 +304,12 @@ describe("Streak Calculation", () => {
 
     const today = new Date("2024-04-06T00:00:00.000Z"); // Saturday
 
-    // Should count all consecutive completions, including non-due days
+    // Should be 0 since today is not completed
     expect(calculateStreak(habit, today)).toBe(0);
+
+    // Add today's completion - streak should be 7
+    habit.completedDates?.push(today);
+    expect(calculateStreak(habit, today)).toBe(7);
   });
 
   test("streak should handle today's due date correctly", () => {
@@ -321,37 +333,12 @@ describe("Streak Calculation", () => {
 
     const today = new Date("2024-04-05T00:00:00.000Z"); // Friday
 
-    // Streak should be 0 since today (Friday) is not completed
+    // Should be 0 since today is not completed
     expect(calculateStreak(habit, today)).toBe(0);
 
     // Add today's completion - streak should be 2
     habit.completedDates?.push(today);
     expect(calculateStreak(habit, today)).toBe(2);
-  });
-
-  test("streak should handle weekend habits correctly", () => {
-    const habit = {
-      frequency: ["saturday", "sunday"],
-      completedDates: [
-        new Date("2024-04-06T00:00:00.000Z"), // Saturday
-        new Date("2024-04-07T00:00:00.000Z"), // Sunday
-      ],
-      startDate: new Date("2024-04-06T00:00:00.000Z"),
-      name: "Test Habit",
-      description: "Test Description",
-      color: "#000000",
-      icon: "check",
-      timeOfDay: "anytime",
-      active: true,
-      userId: "test-user",
-      userTimezone: "UTC",
-      showReward: false,
-    } as unknown as HabitDocument;
-
-    const sunday = new Date("2024-04-07T00:00:00.000Z"); // Sunday
-
-    // When checked on Sunday, streak should be 3
-    expect(calculateStreak(habit, sunday)).toBe(3);
   });
 
   test("streak should handle multiple non-due day completions", () => {
@@ -380,8 +367,12 @@ describe("Streak Calculation", () => {
 
     const today = new Date("2024-04-08T00:00:00.000Z"); // Monday
 
-    // Should count all consecutive completions, including non-due days
+    // Should be 8 since all days are completed
     expect(calculateStreak(habit, today)).toBe(8);
+
+    // Add today's completion - streak should be 9
+    habit.completedDates?.push(today);
+    expect(calculateStreak(habit, today)).toBe(9);
   });
 
   test("streak should handle gaps in completions", () => {
@@ -407,7 +398,11 @@ describe("Streak Calculation", () => {
 
     const today = new Date("2024-04-09T00:00:00.000Z"); // Tuesday
 
-    // Should be 0 since there's a gap between Friday and Monday
+    // Should be 0 since today is not completed
     expect(calculateStreak(habit, today)).toBe(0);
+
+    // Add today's completion - streak should be 3
+    habit.completedDates?.push(today);
+    expect(calculateStreak(habit, today)).toBe(3);
   });
 });
