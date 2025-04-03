@@ -1,4 +1,4 @@
-import { Response } from "express";
+import { Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import { AuthenticatedRequest, protect } from "../middleware/auth.middleware";
 import { User } from "../models/user.model";
@@ -16,7 +16,8 @@ jest.mock("jsonwebtoken", () => ({
 }));
 
 describe("Auth Middleware", () => {
-  let mockRequest: any;
+  // Use a type that matches what the middleware expects
+  let mockRequest: Partial<AuthenticatedRequest>;
   let mockResponse: Partial<Response>;
   let nextFunction: jest.Mock;
   let originalConsoleError: typeof console.error;
@@ -45,7 +46,11 @@ describe("Auth Middleware", () => {
   });
 
   test("should return 401 if no token is provided", async () => {
-    await protect(mockRequest, mockResponse as Response, nextFunction);
+    await protect(
+      mockRequest as Request,
+      mockResponse as Response,
+      nextFunction
+    );
 
     expect(mockResponse.status).toHaveBeenCalledWith(401);
     expect(mockResponse.json).toHaveBeenCalledWith({
@@ -57,12 +62,17 @@ describe("Auth Middleware", () => {
   });
 
   test("should return 401 if token is invalid", async () => {
-    mockRequest.headers.authorization = "Bearer invalidtoken";
+    // codeql-disable-next-line js/hardcoded-credentials
+    mockRequest.headers!.authorization = "Bearer invalidtoken";
     (jwt.verify as jest.Mock).mockImplementation(() => {
       throw new Error("Invalid token");
     });
 
-    await protect(mockRequest, mockResponse as Response, nextFunction);
+    await protect(
+      mockRequest as Request,
+      mockResponse as Response,
+      nextFunction
+    );
 
     expect(mockResponse.status).toHaveBeenCalledWith(401);
     expect(mockResponse.json).toHaveBeenCalledWith({
@@ -74,13 +84,8 @@ describe("Auth Middleware", () => {
   });
 
   test("should set req.user and call next() if token is valid", async () => {
-    const mockUser = {
-      _id: "123",
-      username: "testuser",
-      email: "test@example.com",
-      toString: () => "123",
-    };
-    mockRequest.headers.authorization = "Bearer validtoken";
+    // codeql-disable-next-line js/hardcoded-credentials
+    mockRequest.headers!.authorization = "Bearer validtoken";
     (jwt.verify as jest.Mock).mockReturnValue({ id: "123" });
     (User.findById as jest.Mock).mockImplementation(() => ({
       select: jest.fn().mockResolvedValue({
@@ -92,7 +97,11 @@ describe("Auth Middleware", () => {
       }),
     }));
 
-    await protect(mockRequest, mockResponse as Response, nextFunction);
+    await protect(
+      mockRequest as Request,
+      mockResponse as Response,
+      nextFunction
+    );
 
     expect(mockRequest.user).toEqual({
       id: "123",

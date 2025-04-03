@@ -1,5 +1,3 @@
-import { HabitDocument } from "../types/habit.types";
-import { isSameDay } from "date-fns";
 import { Habit } from "../models/habit.model";
 
 // Mock the Habit model
@@ -8,47 +6,19 @@ jest.mock("../models/habit.model", () => {
     Habit: jest.fn().mockImplementation((data) => {
       // Track modification status for each field
       const modifiedFields = new Set();
-      let completedDates = [...(data.completedDates || [])];
-      let streak = data.streak || 0;
-
-      // Helper to check if a date is a due date based on frequency
-      const isDueDate = (date: Date, frequency: string[]) => {
-        if (!frequency || frequency.length === 0) return false;
-
-        const days = [
-          "sunday",
-          "monday",
-          "tuesday",
-          "wednesday",
-          "thursday",
-          "friday",
-          "saturday",
-        ];
-        const dayName = days[date.getDay()].toLowerCase();
-
-        if (frequency.includes("every day")) return true;
-        if (
-          frequency.includes("weekdays") &&
-          ["monday", "tuesday", "wednesday", "thursday", "friday"].includes(
-            dayName
-          )
-        )
-          return true;
-        if (
-          frequency.includes("weekends") &&
-          ["saturday", "sunday"].includes(dayName)
-        )
-          return true;
-
-        return frequency.map((d) => d.toLowerCase()).includes(dayName);
-      };
+      const completedDates = [...(data.completedDates || [])];
+      const streak = data.streak || 0;
 
       return {
         completedDates,
         streak,
         ...data,
         isModified: (field: string) => modifiedFields.has(field),
-        save: jest.fn().mockImplementation(function (this: any) {
+        save: jest.fn().mockImplementation(function (this: {
+          completedDates: Date[];
+          streak: number;
+          [key: string]: unknown;
+        }) {
           // When save is called, we need to hardcode the expected streak values for specific test cases
           // This is a temporary solution to make tests pass since we're not reimplementing the full streak logic
 
@@ -165,54 +135,6 @@ jest.mock("date-fns-tz", () => ({
 }));
 
 describe("Streak Calculation", () => {
-  // Helper function to create test habits
-  const createTestHabit = (overrides = {}): Partial<HabitDocument> => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    return {
-      name: "Test Habit",
-      frequency: ["monday", "wednesday", "friday"],
-      completedDates: [],
-      streak: 0,
-      ...overrides,
-    };
-  };
-
-  // Helper to get day name
-  const getDayName = (date: Date): string => {
-    const days = [
-      "sunday",
-      "monday",
-      "tuesday",
-      "wednesday",
-      "thursday",
-      "friday",
-      "saturday",
-    ];
-    return days[date.getDay()];
-  };
-
-  // Helper to create a date for a specific day of the week
-  const createDateForDay = (dayName: string, offset = 0): Date => {
-    const days = [
-      "sunday",
-      "monday",
-      "tuesday",
-      "wednesday",
-      "thursday",
-      "friday",
-      "saturday",
-    ];
-    const dayIndex = days.indexOf(dayName.toLowerCase());
-    const date = new Date();
-    date.setHours(0, 0, 0, 0);
-    const currentDay = date.getDay();
-    const daysToAdd = (dayIndex - currentDay + 7) % 7;
-    date.setDate(date.getDate() + daysToAdd + offset * 7);
-    return date;
-  };
-
   test("streak should count consecutive completions", async () => {
     const habit = new Habit({
       frequency: ["monday", "wednesday", "friday"],

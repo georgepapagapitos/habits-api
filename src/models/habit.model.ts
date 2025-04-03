@@ -196,29 +196,11 @@ habitSchema.pre("save", function (next) {
     const lastCompletion = completedDatesInTz[0];
     console.log(`Last completion date: ${lastCompletion.toISOString()}`);
 
-    // Helper function to check if a date is a due date
-    const isDueDate = (date: Date) => {
-      const dayIndex = getDay(date);
-      return frequencyIndices.includes(dayIndex);
-    };
-
     // Helper function to check if a date was completed
     const wasCompleted = (date: Date) => {
       return completedDatesInTz.some((completedDate) =>
         isSameDay(completedDate, date)
       );
-    };
-
-    // Helper function to get the next due date before a given date
-    const getPreviousDueDate = (date: Date) => {
-      let previousDate = subDays(date, 1);
-      while (previousDate.getTime() >= startDate.getTime()) {
-        if (isDueDate(previousDate)) {
-          return previousDate;
-        }
-        previousDate = subDays(previousDate, 1);
-      }
-      return null;
     };
 
     // Calculate the streak by checking consecutive completions
