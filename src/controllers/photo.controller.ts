@@ -96,6 +96,13 @@ export const photoController = {
         return;
       }
 
+      // Get the photo details first
+      const photo = await getPhotoById(photoId);
+      if (!photo) {
+        res.status(404).json({ message: "Photo not found" });
+        return;
+      }
+
       // Sanitize the photo ID
       const sanitizedPhotoId = photoId.replace(/[^a-zA-Z0-9\-_]/g, "");
 
@@ -145,6 +152,7 @@ export const photoController = {
       } catch (error: unknown) {
         const axiosError = error as {
           response?: { status: number };
+          request?: any;
           message?: string;
         };
 
@@ -193,14 +201,31 @@ export const photoController = {
 
         // If we get here, either the refresh failed or it wasn't a token error
         console.error("Error proxying photo:", error);
-        res.status(500).json({
-          message: "Failed to fetch photo",
-          error: axiosError.message || "Unknown error",
-        });
+
+        // Handle different types of errors with appropriate status codes
+        if (axiosError.response) {
+          res.status(axiosError.response.status).json({
+            message: "Failed to fetch photo",
+            error: axiosError.message || "Unknown error",
+          });
+        } else if (axiosError.request) {
+          res.status(504).json({
+            message: "Request timeout",
+            error: axiosError.message || "Unknown error",
+          });
+        } else {
+          res.status(502).json({
+            message: "Network error",
+            error: axiosError.message || "Unknown error",
+          });
+        }
       }
-    } catch (error) {
-      console.error("Error in photo proxy handler:", error);
-      res.status(500).json({ message: "Internal server error" });
+    } catch (error: unknown) {
+      console.error("Error in proxyPhoto:", error);
+      res.status(500).json({
+        message: "Internal server error",
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
     }
   },
   // List all albums

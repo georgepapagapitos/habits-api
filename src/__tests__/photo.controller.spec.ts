@@ -213,7 +213,7 @@ describe("Photo Controller", () => {
 
       // Verify response
       expect(mockResponse.status).toHaveBeenCalledWith(200);
-      expect(mockResponse.json).toHaveBeenCalledWith({ authUrl: mockAuthUrl });
+      expect(mockResponse.json).toHaveBeenCalledWith({ url: mockAuthUrl });
     });
 
     test("should handle errors", () => {
@@ -560,6 +560,7 @@ describe("Photo Controller", () => {
       expect(mockResponse.status).toHaveBeenCalledWith(500);
       expect(mockResponse.json).toHaveBeenCalledWith({
         message: "Internal server error",
+        error: "Service error",
       });
     });
 
