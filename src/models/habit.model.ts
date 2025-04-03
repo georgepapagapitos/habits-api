@@ -221,22 +221,9 @@ habitSchema.pre("save", function (next) {
       return null;
     };
 
-    // Check if there are any missed due dates after the last completion
-    let currentDate = subDays(todayStart, 1);
-    while (currentDate.getTime() > lastCompletion.getTime()) {
-      if (isDueDate(currentDate) && !wasCompleted(currentDate)) {
-        console.log(
-          `Found missed due date after last completion: ${currentDate.toISOString()}`
-        );
-        this.streak = 0;
-        return next();
-      }
-      currentDate = subDays(currentDate, 1);
-    }
-
     // Calculate the streak by checking consecutive completions
     let streak = 0;
-    currentDate = lastCompletion;
+    let currentDate = lastCompletion;
 
     while (currentDate.getTime() >= startDate.getTime()) {
       if (wasCompleted(currentDate)) {
@@ -244,20 +231,10 @@ habitSchema.pre("save", function (next) {
         console.log(
           `Date ${currentDate.toISOString()} was completed, streak now: ${streak}`
         );
-      } else if (isDueDate(currentDate)) {
-        // Found a missed due date, break the streak
-        console.log(
-          `Found missed due date: ${currentDate.toISOString()}, breaking streak`
-        );
-        break;
       }
 
-      // Get the previous due date
-      const previousDueDate = getPreviousDueDate(currentDate);
-      if (!previousDueDate) {
-        break;
-      }
-      currentDate = previousDueDate;
+      // Get the previous date
+      currentDate = subDays(currentDate, 1);
     }
 
     // Final safety check

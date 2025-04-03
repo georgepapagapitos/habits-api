@@ -77,6 +77,19 @@ describe("Habit Controller", () => {
     userTimezone: string;
     isCompletedForDate: jest.Mock;
   };
+  let originalConsoleError: typeof console.error;
+
+  beforeAll(() => {
+    // Store the original console.error
+    originalConsoleError = console.error;
+    // Replace console.error with a no-op function for tests
+    console.error = jest.fn();
+  });
+
+  afterAll(() => {
+    // Restore the original console.error
+    console.error = originalConsoleError;
+  });
 
   beforeEach(() => {
     // Reset mocks for each test
@@ -159,7 +172,7 @@ describe("Habit Controller", () => {
       });
     });
 
-    test("should handle server errors", async () => {
+    test("should handle server errors during habit fetch", async () => {
       // Mock Habit.find to throw error
       (Habit.find as jest.Mock).mockImplementation(() => {
         throw new Error("Database error");
@@ -450,9 +463,11 @@ describe("Habit Controller", () => {
       expect(responseData.data.longestStreak.habit.name).toBe("Habit 2");
     });
 
-    test("should handle errors", async () => {
+    test("should handle database errors during habit stats calculation", async () => {
       // Mock Habit.find to throw error
-      (Habit.find as jest.Mock).mockRejectedValue(new Error("Database error"));
+      (Habit.find as jest.Mock).mockImplementation(() => {
+        throw new Error("Database error");
+      });
 
       // Call controller
       await habitController.getStats(
@@ -555,9 +570,11 @@ describe("Habit Controller", () => {
       });
     });
 
-    test("should handle errors", async () => {
-      // Mock save to throw error
-      mockHabit.save.mockRejectedValue(new Error("Database error"));
+    test("should handle database errors during habit reset", async () => {
+      // Mock Habit.findById to throw error
+      (Habit.findById as jest.Mock).mockImplementation(() => {
+        throw new Error("Database error");
+      });
 
       // Call controller
       await habitController.resetHabit(
@@ -569,7 +586,7 @@ describe("Habit Controller", () => {
       expect(mockResponse.status).toHaveBeenCalledWith(500);
       expect(mockResponse.json).toHaveBeenCalledWith({
         success: false,
-        message: "Server Error",
+        message: "Error resetting habit",
         error: expect.any(Error),
       });
     });
