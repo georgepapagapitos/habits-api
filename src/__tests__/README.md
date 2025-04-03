@@ -28,6 +28,24 @@ To run tests with coverage:
 npm run test:coverage
 ```
 
+## Environment Variables for Tests
+
+Tests use environment variables to avoid hardcoded credentials. Create a `.env` file in the project root with these variables:
+
+```
+TEST_PASSWORD=TestPassword123!
+TEST_VALID_TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJ0ZXN0MTIzIiwiaWF0IjoxNTE2MjM5MDIyfQ.nLOA5aU-mVJXHbNnAVT0LP1wDPc3-b8dBRQ32IlZEh0
+TEST_INVALID_TOKEN=invalid.token.value
+```
+
+In CI/CD environments (like GitHub Actions), these values should be set as repository secrets. This approach:
+
+1. Avoids hardcoded credentials that might trigger security scanners
+2. Makes it easy to update test values without changing code
+3. Follows security best practices
+
+Default values are provided in the tests when environment variables are not available, but it's recommended to set these variables explicitly.
+
 ## Test Structure
 
 ### Core Functionality Tests

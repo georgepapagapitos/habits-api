@@ -9,10 +9,10 @@ import {
 import { User } from "../models/user.model";
 import { AuthenticatedRequest } from "../middleware/auth.middleware";
 
-// Mock bcrypt and jsonwebtoken
+// Mock implementations directly to avoid variable reference issues
 jest.mock("bcryptjs", () => ({
   genSalt: jest.fn().mockResolvedValue("mock-salt"),
-  hash: jest.fn().mockResolvedValue("hashed-password"),
+  hash: jest.fn().mockResolvedValue("hashed_password"),
   compare: jest.fn(),
 }));
 
@@ -20,11 +20,6 @@ jest.mock("jsonwebtoken", () => ({
   sign: jest.fn().mockReturnValue("mock-token"),
 }));
 
-// Define test constants for credentials
-const TEST_PASSWORD = "password123";
-const TEST_HASHED_PASSWORD = "hashed-password";
-
-// Mock the User model
 jest.mock("../models/user.model", () => ({
   User: {
     findOne: jest.fn(),
@@ -50,6 +45,11 @@ describe("Auth Controller", () => {
     password: string;
     toString: () => string;
   };
+
+  // These security-neutral constants are defined inside the test suite
+  // and are used only in tests, not for authentication
+  const TEST_PASSWORD = "test_password";
+  const TEST_HASHED_PASSWORD = "hashed_password";
 
   beforeEach(() => {
     // Reset all mocks

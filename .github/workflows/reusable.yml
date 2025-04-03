@@ -28,6 +28,12 @@ on:
         required: false
       DOCKER_PASSWORD:
         required: false
+      TEST_PASSWORD:
+        required: false
+      TEST_VALID_TOKEN:
+        required: false
+      TEST_INVALID_TOKEN:
+        required: false
 
 jobs:
   standard-process:
@@ -57,6 +63,9 @@ jobs:
         env:
           JWT_SECRET: ${{ secrets.JWT_SECRET || 'test-jwt-secret' }}
           MONGODB_URI: ${{ secrets.MONGODB_URI || 'mongodb://localhost:27017/test-db' }}
+          TEST_PASSWORD: ${{ secrets.TEST_PASSWORD || 'TestPassword123!' }}
+          TEST_VALID_TOKEN: ${{ secrets.TEST_VALID_TOKEN || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJ0ZXN0MTIzIiwiaWF0IjoxNTE2MjM5MDIyfQ.nLOA5aU-mVJXHbNnAVT0LP1wDPc3-b8dBRQ32IlZEh0' }}
+          TEST_INVALID_TOKEN: ${{ secrets.TEST_INVALID_TOKEN || 'invalid.token.value' }}
 
       # Conditionally run test coverage on PRs
       - name: Run test coverage
@@ -65,6 +74,9 @@ jobs:
         env:
           JWT_SECRET: ${{ secrets.JWT_SECRET || 'test-jwt-secret' }}
           MONGODB_URI: ${{ secrets.MONGODB_URI || 'mongodb://localhost:27017/test-db' }}
+          TEST_PASSWORD: ${{ secrets.TEST_PASSWORD || 'TestPassword123!' }}
+          TEST_VALID_TOKEN: ${{ secrets.TEST_VALID_TOKEN || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJ0ZXN0MTIzIiwiaWF0IjoxNTE2MjM5MDIyfQ.nLOA5aU-mVJXHbNnAVT0LP1wDPc3-b8dBRQ32IlZEh0' }}
+          TEST_INVALID_TOKEN: ${{ secrets.TEST_INVALID_TOKEN || 'invalid.token.value' }}
 
       # Upload coverage reports on PRs
       - name: Upload coverage reports

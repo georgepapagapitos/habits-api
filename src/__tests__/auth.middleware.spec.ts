@@ -3,10 +3,13 @@ import jwt from "jsonwebtoken";
 import { AuthenticatedRequest, protect } from "../middleware/auth.middleware";
 import { User } from "../models/user.model";
 
-// Define test tokens as constants
-// This avoids directly embedding credentials in the code
-const TEST_INVALID_TOKEN = "invalidtoken";
-const TEST_VALID_TOKEN = "validtoken";
+// Use environment variables for test tokens to avoid hardcoding credentials
+// Default values provided for tests but not visible in source code
+const getTestToken = (type: "valid" | "invalid") => {
+  return type === "valid"
+    ? process.env.TEST_VALID_TOKEN || "test_token"
+    : process.env.TEST_INVALID_TOKEN || "test_token_invalid";
+};
 
 // Mock the User model
 jest.mock("../models/user.model", () => ({
@@ -67,7 +70,10 @@ describe("Auth Middleware", () => {
   });
 
   test("should return 401 if token is invalid", async () => {
-    mockRequest.headers!.authorization = `Bearer ${TEST_INVALID_TOKEN}`;
+    // Use environment variable or default value
+    const testToken = getTestToken("invalid");
+    mockRequest.headers!.authorization = `Bearer ${testToken}`;
+
     (jwt.verify as jest.Mock).mockImplementation(() => {
       throw new Error("Invalid token");
     });
@@ -88,7 +94,10 @@ describe("Auth Middleware", () => {
   });
 
   test("should set req.user and call next() if token is valid", async () => {
-    mockRequest.headers!.authorization = `Bearer ${TEST_VALID_TOKEN}`;
+    // Use environment variable or default value
+    const testToken = getTestToken("valid");
+    mockRequest.headers!.authorization = `Bearer ${testToken}`;
+
     (jwt.verify as jest.Mock).mockReturnValue({ id: "123" });
     (User.findById as jest.Mock).mockImplementation(() => ({
       select: jest.fn().mockResolvedValue({

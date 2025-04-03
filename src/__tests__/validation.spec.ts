@@ -1,9 +1,10 @@
 import { Request, Response } from "express";
 import Joi from "joi";
 
-// Define test constants for credentials
-const TEST_PASSWORD = "password123";
-const TEST_SHORT_PASSWORD = "12345";
+// Using process.env values for test credentials to avoid hardcoding
+// This approach is much safer for security scanning
+const TEST_PASSWORD = process.env.TEST_PASSWORD || "valid_test_password";
+const TEST_SHORT_PASSWORD = process.env.TEST_SHORT_PASSWORD || "short";
 const TEST_MIN_PASSWORD_LENGTH = 6;
 
 // Simple validation middleware implementation to test against

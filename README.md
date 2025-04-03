@@ -90,6 +90,11 @@ A RESTful API for the Habits application built with Node.js, Express, TypeScript
    JWT_SECRET=your_jwt_secret_key
    NODE_ENV=development
 
+   # Test Variables
+   TEST_PASSWORD=TestPassword123!
+   TEST_VALID_TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJ0ZXN0MTIzIiwiaWF0IjoxNTE2MjM5MDIyfQ.nLOA5aU-mVJXHbNnAVT0LP1wDPc3-b8dBRQ32IlZEh0
+   TEST_INVALID_TOKEN=invalid.token.value
+
    # Google Photos Integration (optional)
    GOOGLE_CLIENT_ID=your_client_id
    GOOGLE_CLIENT_SECRET=your_client_secret
@@ -164,6 +169,28 @@ Tests run automatically on every push and pull request through GitHub Actions, e
 1. All tests pass
 2. TypeScript types are valid
 3. Code meets linting standards
+
+### GitHub Repository Secrets for CI/CD
+
+The following GitHub repository secrets must be set up for CI/CD workflows:
+
+1. **Required Secrets**
+
+   - `JWT_SECRET` - Secret key for JWT token generation
+   - `MONGODB_URI` - MongoDB connection string
+
+2. **Testing Secrets**
+   - `TEST_PASSWORD` - Password to use for test authentication
+   - `TEST_VALID_TOKEN` - Valid JWT token for testing authentication middleware
+   - `TEST_INVALID_TOKEN` - Invalid JWT token for testing error cases
+
+To set up these secrets:
+
+1. Go to your GitHub repository
+2. Navigate to "Settings" > "Secrets and variables" > "Actions"
+3. Click "New repository secret" and add each required secret
+
+These secrets are used by test files to avoid hardcoding sensitive values and to comply with security best practices.
 
 ## Docker Support
 
@@ -355,6 +382,9 @@ Authorization: Bearer <your_jwt_token>
 | JWT_SECRET             | Secret for JWT token generation | (no default)                                    | Yes        |
 | NODE_ENV               | Environment (dev/prod)          | development                                     | Yes        |
 | NODE_NO_WARNINGS       | Suppress Node.js warnings       | 1                                               | No         |
+| TEST_PASSWORD          | Password for tests              | TestPassword123!                                | For Tests  |
+| TEST_VALID_TOKEN       | Valid JWT token for tests       | eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...         | For Tests  |
+| TEST_INVALID_TOKEN     | Invalid JWT token for tests     | invalid.token.value                             | For Tests  |
 | GOOGLE_CLIENT_ID       | Google OAuth client ID          | (no default)                                    | For Photos |
 | GOOGLE_CLIENT_SECRET   | Google OAuth client secret      | (no default)                                    | For Photos |
 | GOOGLE_REDIRECT_URI    | OAuth callback URL              | http://localhost:5050/api/photos/oauth2callback | For Photos |
