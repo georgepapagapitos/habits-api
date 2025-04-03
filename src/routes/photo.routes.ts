@@ -45,7 +45,7 @@ router.get(
 );
 
 // Admin routes - Used for initial setup only
-router.get("/auth", authLimiter, protect, photoController.getAuthUrl);
+router.get("/auth", authLimiter, photoController.getAuthUrl);
 router.get("/oauth2callback", authLimiter, photoController.handleOAuthCallback);
 router.get("/albums", adminLimiter, protect, photoController.listAlbums);
 

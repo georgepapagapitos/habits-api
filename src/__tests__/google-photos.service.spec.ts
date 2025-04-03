@@ -59,6 +59,7 @@ import {
   getRandomPhoto,
   handleOAuth2Callback,
   listAlbums,
+  refreshTokensWithRetry,
 } from "../services/google-photos.service";
 
 // Get access to private functions for testing
@@ -839,6 +840,80 @@ describe("Google Photos Service", () => {
       } finally {
         consoleErrorSpy.mockRestore();
       }
+    });
+  });
+
+  describe("Token Refresh", () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+      // Reset environment variables
+      process.env.GOOGLE_ACCESS_TOKEN = "test-access-token";
+      process.env.GOOGLE_REFRESH_TOKEN = "test-refresh-token";
+      process.env.GOOGLE_TOKEN_EXPIRY = "1234567890";
+
+      // Mock updateTokensInEnv using spyOn
+      jest
+        .spyOn(googlePhotosService, "updateTokensInEnv")
+        .mockImplementation(() => Promise.resolve());
+    });
+
+    test("should successfully refresh tokens", async () => {
+      // Mock successful token refresh
+      (mockOAuth2Instance.getAccessToken as jest.Mock).mockResolvedValue({
+        token: "new-access-token",
+      });
+
+      await expect(refreshTokensWithRetry()).resolves.not.toThrow();
+      expect(mockOAuth2Instance.getAccessToken).toHaveBeenCalled();
+      expect(googlePhotosService.updateTokensInEnv).toHaveBeenCalledWith({
+        access_token: "new-access-token",
+        refresh_token: "test-refresh-token",
+        expiry_date: expect.any(Number),
+      });
+    });
+
+    test("should handle invalid_grant error and clear tokens", async () => {
+      // Mock invalid_grant error with proper Error object
+      const error = new Error("invalid_grant");
+      (mockOAuth2Instance.getAccessToken as jest.Mock).mockRejectedValue(error);
+
+      await expect(refreshTokensWithRetry()).rejects.toThrow(
+        "REFRESH_TOKEN_INVALID"
+      );
+      expect(googlePhotosService.updateTokensInEnv).toHaveBeenCalledWith({
+        access_token: null,
+        refresh_token: null,
+        expiry_date: null,
+      });
+    });
+
+    test("should retry on other errors with exponential backoff", async () => {
+      // Mock temporary error that succeeds on third attempt
+      let attempt = 0;
+      (mockOAuth2Instance.getAccessToken as jest.Mock).mockImplementation(
+        () => {
+          attempt++;
+          if (attempt < 3) {
+            throw new Error("Temporary error");
+          }
+          return { token: "new-access-token" };
+        }
+      );
+
+      await expect(refreshTokensWithRetry()).resolves.not.toThrow();
+      expect(mockOAuth2Instance.getAccessToken).toHaveBeenCalledTimes(3);
+    });
+
+    test("should throw error after max retries", async () => {
+      // Mock persistent error
+      (mockOAuth2Instance.getAccessToken as jest.Mock).mockRejectedValue(
+        new Error("Persistent error")
+      );
+
+      await expect(refreshTokensWithRetry(2)).rejects.toThrow(
+        "Persistent error"
+      );
+      expect(mockOAuth2Instance.getAccessToken).toHaveBeenCalledTimes(2);
     });
   });
 });

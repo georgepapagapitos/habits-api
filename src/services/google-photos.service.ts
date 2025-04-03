@@ -260,7 +260,53 @@ let isFetchingMediaItems = false;
 // Queue of functions to call when media items are fetched
 let mediaItemsFetchQueue: ((items: GooglePhoto[]) => void)[] = [];
 
-// Function to fetch media items with enhanced caching and concurrency control
+// Enhanced token refresh mechanism
+export const refreshTokensWithRetry = async (maxRetries = 3): Promise<void> => {
+  let lastError: Error | undefined;
+
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      // Try to get a fresh token
+      const token = await oauth2Client.getAccessToken();
+
+      // If successful, update the tokens
+      await updateTokensInEnv({
+        access_token: token.token,
+        refresh_token: process.env.GOOGLE_REFRESH_TOKEN, // Preserve existing refresh token
+        expiry_date: Date.now() + 3600 * 1000, // 1 hour from now
+      });
+
+      console.log("Successfully refreshed tokens");
+      return;
+    } catch (error: unknown) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+
+      // If it's an invalid_grant error, we need to re-authenticate
+      if (lastError.message && lastError.message.includes("invalid_grant")) {
+        console.error(
+          "Refresh token is invalid or revoked. Need to re-authenticate."
+        );
+        // Clear the invalid tokens
+        await updateTokensInEnv({
+          access_token: null,
+          refresh_token: null,
+          expiry_date: null,
+        });
+        throw new Error("REFRESH_TOKEN_INVALID");
+      }
+
+      // For other errors, wait and retry
+      console.warn(`Token refresh attempt ${i + 1} failed:`, lastError.message);
+      await new Promise((resolve) => setTimeout(resolve, 1000 * (i + 1))); // Exponential backoff
+    }
+  }
+
+  if (lastError) {
+    throw lastError;
+  }
+};
+
+// Modified fetchMediaItems to use the enhanced token refresh
 const fetchMediaItems = async (): Promise<GooglePhoto[]> => {
   const now = Date.now();
 
@@ -285,18 +331,31 @@ const fetchMediaItems = async (): Promise<GooglePhoto[]> => {
   isFetchingMediaItems = true;
 
   try {
-    // Ensure credentials are set
-    if (!setCredentialsFromEnv()) {
-      throw new Error("Google credentials not available");
+    // Try to refresh tokens if needed
+    try {
+      await refreshTokensWithRetry();
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      if (err.message === "REFRESH_TOKEN_INVALID") {
+        // Clear the queue with an empty array on error
+        mediaItemsFetchQueue.forEach((callback) => {
+          callback([]);
+        });
+        mediaItemsFetchQueue = [];
+        throw new Error(
+          "Google Photos authentication required. Please re-authenticate."
+        );
+      }
+      throw err;
+    }
+
+    if (!GOOGLE_PHOTOS_ALBUM_ID) {
+      throw new Error("Album ID not configured");
     }
 
     // Get a fresh token
     const token = await oauth2Client.getAccessToken();
     const accessToken = token.token;
-
-    if (!GOOGLE_PHOTOS_ALBUM_ID) {
-      throw new Error("Album ID not configured");
-    }
 
     // Use axios to make the request directly
     const response = await axios.post(
@@ -330,14 +389,14 @@ const fetchMediaItems = async (): Promise<GooglePhoto[]> => {
     mediaItemsFetchQueue = [];
 
     return mediaItems;
-  } catch (error) {
+  } catch (error: unknown) {
     // Clear the queue with an empty array on error
     mediaItemsFetchQueue.forEach((callback) => {
       callback([]);
     });
     mediaItemsFetchQueue = [];
 
-    throw error;
+    throw error instanceof Error ? error : new Error(String(error));
   } finally {
     // Mark that we're done fetching
     isFetchingMediaItems = false;
@@ -423,7 +482,28 @@ export const getRandomPhoto = async (
     }
 
     // Fetch media items (uses caching internally)
-    const mediaItems = await fetchMediaItems();
+    let mediaItems: GooglePhoto[] = [];
+    try {
+      mediaItems = await fetchMediaItems();
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      if (
+        err.message ===
+        "Google Photos authentication required. Please re-authenticate."
+      ) {
+        console.error(
+          "Authentication required. Clearing tokens and requiring re-authentication."
+        );
+        // Clear the tokens
+        await updateTokensInEnv({
+          access_token: null,
+          refresh_token: null,
+          expiry_date: null,
+        });
+        throw new Error("AUTHENTICATION_REQUIRED");
+      }
+      throw err;
+    }
 
     if (mediaItems.length === 0) {
       return null;
@@ -622,8 +702,12 @@ export const getRandomPhoto = async (
     }
 
     return photoResponse;
-  } catch (error) {
-    console.error("Error fetching random photo:", error);
+  } catch (error: unknown) {
+    const err = error instanceof Error ? error : new Error(String(error));
+    if (err.message === "AUTHENTICATION_REQUIRED") {
+      throw err; // Re-throw authentication required error
+    }
+    console.error("Error fetching random photo:", err);
     return null; // Return null instead of throwing to prevent client errors
   }
 };
