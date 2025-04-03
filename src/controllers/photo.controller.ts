@@ -7,6 +7,7 @@ import {
   handleOAuth2Callback,
   listAlbums,
 } from "../services/google-photos.service";
+import { oauth2Client } from "../services/google-photos.service";
 
 // Create a controller object following the same pattern as habitController
 export const photoController = {
@@ -83,37 +84,23 @@ export const photoController = {
   // Proxy a Google Photos image to avoid CORS issues
   proxyPhoto: async (req: Request, res: Response): Promise<void> => {
     try {
-      const { photoId, width, height } = req.params;
-      // Sanitize inputs for logging
-      const sanitizedPhotoId = photoId.replace(/[^\w-]/g, "");
-      const sanitizedWidth = width ? width.replace(/\D/g, "") : "default";
-      const sanitizedHeight = height ? height.replace(/\D/g, "") : "default";
-      console.log(
-        "Proxying photo", // Fixed string without interpolation
-        {
-          photoId: sanitizedPhotoId,
-          width: sanitizedWidth,
-          height: sanitizedHeight,
-        } // Pass as object
-      );
+      const { photoId } = req.params;
 
-      // Get photo details from Google Photos API
-      const photo = await getPhotoById(photoId);
-
-      if (!photo) {
-        // Use sanitized ID for logging with fixed format
-        console.error("Photo not found", { photoId: sanitizedPhotoId });
-        res.status(404).json({ message: "Photo not found" });
+      // Input validation to prevent SSRF
+      if (
+        !photoId ||
+        typeof photoId !== "string" ||
+        !/^[a-zA-Z0-9\-_]+$/.test(photoId)
+      ) {
+        res.status(400).json({ message: "Invalid photo ID format" });
         return;
       }
 
-      // Construct the optimized URL with parameters
-      const w = width || "400";
-      const h = height || "400";
-      const optimizedUrl = `${photo.baseUrl}=d-w${w}-h${h}-c`;
-      console.log(
-        `Using Google Photos URL: ${optimizedUrl.substring(0, 100)}...`
-      );
+      // Sanitize the photo ID
+      const sanitizedPhotoId = photoId.replace(/[^a-zA-Z0-9\-_]/g, "");
+
+      // Optimize the URL for better performance
+      const optimizedUrl = `https://lh3.googleusercontent.com/${sanitizedPhotoId}=w1200-h800`;
 
       try {
         // Ensure our Google credentials are fresh
@@ -132,16 +119,13 @@ export const photoController = {
         const imageResponse = await axios.get(optimizedUrl, {
           responseType: "arraybuffer",
           headers: {
-            // Set proper referer to avoid Google Photos blocking the request
             Referer:
               process.env.APP_URL ||
               "http://localhost:5050" ||
               "http://localhost:5051",
-            // Use a common user agent
             "User-Agent":
               "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
           },
-          // Add a timeout to prevent hanging requests
           timeout: 5000,
         });
 
@@ -150,61 +134,72 @@ export const photoController = {
           "Content-Type",
           imageResponse.headers["content-type"] || "image/jpeg"
         );
-        res.set("Cache-Control", "public, max-age=86400"); // Cache for 24 hours
-        res.set("Access-Control-Allow-Origin", "*"); // Allow any origin to access this image
+        res.set("Cache-Control", "public, max-age=86400");
+        res.set("Access-Control-Allow-Origin", "*");
 
         // Send the image data
         res.send(Buffer.from(imageResponse.data));
         console.log("Successfully proxied photo", {
           photoId: sanitizedPhotoId,
         });
-      } catch (fetchError: unknown) {
-        // Type check the error
-        const axiosError = fetchError as {
-          message?: string;
+      } catch (error: unknown) {
+        const axiosError = error as {
           response?: { status: number };
-          request?: unknown;
+          message?: string;
         };
 
-        // Sanitize the photo ID to prevent injection in logs
-        // Use a fixed format string and ensure the message is not user-controlled
-        const sanitizedPhotoId = photoId.replace(/[^\w-]/g, "");
-        console.error(
-          "Error proxying photo ID", // Fixed string without interpolation
-          {
-            photoId: sanitizedPhotoId,
-            errorMessage: axiosError.message || "Unknown error",
-          } // Pass as object
-        );
+        // If we get an invalid_grant error, try to refresh the token
+        if (axiosError.message?.includes("invalid_grant")) {
+          try {
+            console.log("Token invalid, attempting to refresh...");
+            // Get a fresh token
+            const { token: accessToken } = await oauth2Client.getAccessToken();
 
-        // Provide different error responses based on error type
-        if (axiosError.response) {
-          // The request was made and the server responded with a non-2xx status
-          const status = axiosError.response?.status || 0;
-          console.error("Google Photos API error", { statusCode: status });
-          res.status(axiosError.response.status).json({
-            message: "Google Photos returned an error",
-            status: axiosError.response.status,
-          });
-        } else if (axiosError.request) {
-          // The request was made but no response was received
-          console.error("No response received from Google Photos API", {
-            proxyFor: sanitizedPhotoId,
-          });
-          res.status(504).json({ message: "No response from Google Photos" });
-        } else {
-          // Something else caused the error
-          res
-            .status(502)
-            .json({ message: "Failed to proxy photo from Google Photos" });
+            if (accessToken) {
+              console.log("Token refreshed successfully, retrying request...");
+              // Retry the request with the new token
+              const retryResponse = await axios.get(optimizedUrl, {
+                responseType: "arraybuffer",
+                headers: {
+                  Referer:
+                    process.env.APP_URL ||
+                    "http://localhost:5050" ||
+                    "http://localhost:5051",
+                  "User-Agent":
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+                },
+                timeout: 5000,
+              });
+
+              // Set appropriate headers for the image
+              res.set(
+                "Content-Type",
+                retryResponse.headers["content-type"] || "image/jpeg"
+              );
+              res.set("Cache-Control", "public, max-age=86400");
+              res.set("Access-Control-Allow-Origin", "*");
+
+              // Send the image data
+              res.send(Buffer.from(retryResponse.data));
+              console.log("Successfully proxied photo after token refresh", {
+                photoId: sanitizedPhotoId,
+              });
+              return;
+            }
+          } catch (refreshError) {
+            console.error("Failed to refresh token:", refreshError);
+          }
         }
+
+        // If we get here, either the refresh failed or it wasn't a token error
+        console.error("Error proxying photo:", error);
+        res.status(500).json({
+          message: "Failed to fetch photo",
+          error: axiosError.message || "Unknown error",
+        });
       }
-    } catch (error: unknown) {
-      // Type check the error
-      const err = error as { message?: string };
-      console.error("Error in photo proxy handler", {
-        error: err.message || "Unknown error",
-      });
+    } catch (error) {
+      console.error("Error in photo proxy handler:", error);
       res.status(500).json({ message: "Internal server error" });
     }
   },
@@ -258,11 +253,11 @@ export const photoController = {
     }
   },
 
-  // Get OAuth URL for initial setup (admin use only)
-  getAuthUrl: (req: Request, res: Response): void => {
+  // Get Google Photos auth URL
+  getAuthUrl: async (req: Request, res: Response): Promise<void> => {
     try {
       const authUrl = getAuthUrl();
-      res.status(200).json({ authUrl });
+      res.status(200).json({ url: authUrl });
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";

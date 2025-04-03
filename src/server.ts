@@ -7,14 +7,14 @@ import { logger } from "./utils/logger";
 // Connect to MongoDB
 connectDB()
   .then(() => {
-    // Start server - listen on all network interfaces
-    const server = app.listen(PORT, "0.0.0.0", () => {
+    // Start server - listen on localhost in development
+    const host =
+      process.env.NODE_ENV === "production" ? "0.0.0.0" : "localhost";
+    const server = app.listen(PORT, host, () => {
       logger.info(
         `Server running in ${process.env.NODE_ENV} mode on port ${PORT}`
       );
-      logger.info(
-        `Access the server at http://localhost:${PORT} or http://192.168.0.20:${PORT}`
-      );
+      logger.info(`Access the server at http://${host}:${PORT}`);
     });
 
     // Set up scheduled tasks

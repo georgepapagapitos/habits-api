@@ -5,14 +5,9 @@ import photoRoutes from "./photo.routes";
 
 const router = Router();
 
-// Health check route
-router.get("/health", (req, res) => {
-  res.status(200).json({ status: "ok" });
-});
-
 // API routes
-router.use("/api/habits", habitRoutes);
-router.use("/api/auth", authRoutes);
-router.use("/api/photos", photoRoutes);
+router.use("/habits", habitRoutes);
+router.use("/auth", authRoutes);
+router.use("/photos", photoRoutes);
 
 export default router;

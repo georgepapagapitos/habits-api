@@ -28,12 +28,25 @@ app.use(express.json()); // Parse JSON bodies
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
 
 // Health check endpoint for deployment verification
-app.get("/api/health", (req, res) => {
+app.get("/health", (req, res) => {
   res.status(200).json({ status: "ok", environment: process.env.NODE_ENV });
 });
 
+// Root API endpoint
+app.get("/api", (req, res) => {
+  res.status(200).json({
+    status: "ok",
+    message: "API is running",
+    endpoints: {
+      habits: "/api/habits",
+      auth: "/api/auth",
+      photos: "/api/photos",
+    },
+  });
+});
+
 // Mount routes
-app.use(routes);
+app.use("/api", routes);
 
 // Error handling
 app.use(notFoundHandler);
